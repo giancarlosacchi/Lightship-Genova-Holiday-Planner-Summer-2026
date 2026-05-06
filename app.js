@@ -65,7 +65,6 @@ let pushPendingAgain = false;  // user clicked again while a save was in flight
 
 
 // FLIP technique: animate hero-brand smoothly between centered and left positions.
-// First: measure old position. Apply change. Last: measure new. Invert: translateX old→new. Play: animate to 0.
 function transitionBrandPosition(applyChange) {
   const brand = document.querySelector(".hero-brand");
   const heroId = document.querySelector(".hero-identity");
@@ -76,15 +75,21 @@ function transitionBrandPosition(applyChange) {
   const dx = oldRect.left - newRect.left;
   if (Math.abs(dx) > 1) {
     brand.animate(
-      [{ transform: \`translateX(\${dx}px)\` }, { transform: 'translateX(0)' }],
-      { duration: 850, easing: 'cubic-bezier(0.22, 1, 0.36, 1)', fill: 'none' }
+      [
+        { transform: "translateX(" + dx + "px)" },
+        { transform: "translateX(0)" }
+      ],
+      { duration: 850, easing: "cubic-bezier(0.22, 1, 0.36, 1)", fill: "none" }
     );
   }
-  // Identity card (top-right) gets a small slide-in from the right — only when it became visible
+  // Identity card (top-right) slides in from the right when it becomes visible
   if (heroId && !heroId.hidden) {
     heroId.animate(
-      [{ opacity: 0, transform: 'translateX(20px)' }, { opacity: 1, transform: 'translateX(0)' }],
-      { duration: 600, easing: 'cubic-bezier(0.22, 1, 0.36, 1)', delay: 200, fill: 'both' }
+      [
+        { opacity: 0, transform: "translateX(20px)" },
+        { opacity: 1, transform: "translateX(0)" }
+      ],
+      { duration: 600, easing: "cubic-bezier(0.22, 1, 0.36, 1)", delay: 200, fill: "both" }
     );
   }
 }
