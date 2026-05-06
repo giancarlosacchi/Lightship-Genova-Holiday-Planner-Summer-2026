@@ -72,12 +72,16 @@ async function pullFromBin() {
     if (record.updatedAt && record.updatedAt === lastRemoteUpdatedAt) return; // unchanged
     lastRemoteUpdatedAt = record.updatedAt || new Date().toISOString();
     // Merge remote into state, but never overwrite OUR row mid-edit
+    let mergedMine = false;
     for (const [empId, dates] of Object.entries(record.selections)) {
       if (!EMP_BY_ID[empId]) continue;
       if (empId === state.me && hasPendingChanges()) continue; // user has unsaved edits
       state.selections[empId] = new Set(dates);
+      if (empId === state.me) mergedMine = true;
     }
-    if (!hasPendingChanges()) setSavedMine();
+    // If we merged our own row from remote, sync the "saved" snapshot so the
+    // pending-bar doesn't show false positives at startup.
+    if (mergedMine || !state.me) setSavedMine();
     renderActiveMonth();
     renderSummary();
     renderFilterList();
@@ -676,6 +680,8 @@ function shareMyLink() {
    ============================================================ */
 function init() {
   loadState();
+  // Snapshot current as "saved" to avoid false-positive pending bar at startup
+  setSavedMine();
   renderAll();
 
   // Initial pull from backend, then poll every POLL_INTERVAL_MS
