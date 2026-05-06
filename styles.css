@@ -1285,11 +1285,16 @@ body.no-identity .pick-dept-label {
   text-align: right;
 }
 
-/* Tweak the View Transitions duration & easing */
+/* Smooth, longer view transitions — silky slide rather than fade-zoom.
+   Uses a deep ease-out so the element decelerates into its final position. */
+::view-transition-group(*) {
+  animation-duration: 0.85s;
+  animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+}
 ::view-transition-old(root),
 ::view-transition-new(root) {
-  animation-duration: 0.5s;
-  animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  animation-duration: 0.6s;
+  animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
 }
 ::view-transition-old(hero-brand),
 ::view-transition-new(hero-brand),
@@ -1297,6 +1302,15 @@ body.no-identity .pick-dept-label {
 ::view-transition-new(hero-id),
 ::view-transition-old(identity-bar),
 ::view-transition-new(identity-bar) {
-  animation-duration: 0.5s;
-  animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  animation-duration: 0.85s;
+  animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+}
+/* Keep the brand fully opaque the whole time — only its position interpolates,
+   so it really looks like it slides from center to left (no fade-through). */
+::view-transition-old(hero-brand) { opacity: 1; }
+::view-transition-new(hero-brand) { opacity: 1; }
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) { animation-duration: 0.001s !important; }
 }
