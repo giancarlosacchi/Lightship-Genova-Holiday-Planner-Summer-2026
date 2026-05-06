@@ -288,7 +288,7 @@ function renderIdentityBar() {
 
     const prompt = document.createElement("p");
     prompt.className = "pick-prompt";
-    prompt.textContent = "Welcome aboard. Who's planning today?";
+    prompt.textContent = "Select who you are";
     wrap.appendChild(prompt);
 
     for (const dept of DEPARTMENTS) {
@@ -305,11 +305,16 @@ function renderIdentityBar() {
         chip.className = "emp-chip";
         chip.innerHTML = '<span class="swatch" style="background:' + emp.color + '"></span>' + emp.id;
         chip.addEventListener("click", () => {
-          state.me = emp.id;
-          state.visible.add(emp.id);
-          saveState();
-          renderAll();
-          showToast("Welcome, " + emp.id);
+          const apply = () => {
+            state.me = emp.id;
+            state.visible.add(emp.id);
+            saveState();
+            renderAll();
+            showToast("Welcome, " + emp.id);
+          };
+          if (document.startViewTransition) {
+            document.startViewTransition(apply);
+          } else { apply(); }
         });
         row.appendChild(chip);
       }
@@ -341,9 +346,10 @@ function renderIdentityBar() {
       if (pwd === null) return;
       if (pwd !== ADMIN_PASSWORD) { alert("Wrong password."); return; }
       if (!confirm("Switch user? Your holidays stay saved in this browser.")) return;
-      state.me = null;
-      saveState();
-      renderAll();
+      const apply = () => { state.me = null; saveState(); renderAll(); };
+      if (document.startViewTransition) {
+        document.startViewTransition(apply);
+      } else { apply(); }
     });
   }
 }

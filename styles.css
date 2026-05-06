@@ -1223,3 +1223,80 @@ body.no-identity .footer { display: none; }
 
 /* Remove the conflict corner triangle from mini-days — heat-map color is enough */
 .mini-day.conflict::before { display: none; }
+
+/* ---------- Identity-first welcome state ---------- */
+
+/* Smooth layout transitions via View Transitions API + CSS fallback */
+.hero-brand    { view-transition-name: hero-brand; }
+.hero-identity { view-transition-name: hero-id; }
+.identity-bar  { view-transition-name: identity-bar; }
+
+/* When NO identity is selected: hero is centered; picker fills the page */
+body.no-identity .hero {
+  padding: 64px 0 0;
+}
+body.no-identity .hero-inner {
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding-bottom: 24px;
+}
+body.no-identity .hero-brand {
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  text-align: center;
+}
+body.no-identity .hero-mark {
+  width: 64px; height: 64px;
+}
+body.no-identity .eyebrow {
+  justify-content: center;
+}
+body.no-identity .display {
+  font-size: clamp(40px, 6vw, 64px);
+}
+
+/* Picker: centered, generous spacing */
+body.no-identity .identity-bar {
+  background: transparent;
+  border-top: none;
+  border-bottom: none;
+  padding: 24px 0 80px;
+}
+body.no-identity .pick-identity {
+  max-width: 760px;
+  margin: 0 auto;
+  text-align: center;
+  align-items: center;
+}
+body.no-identity .pick-prompt {
+  text-align: center;
+  font-size: 24px;
+  margin-bottom: 18px;
+}
+body.no-identity .pick-prompt::before {
+  display: inline;
+}
+body.no-identity .pick-row {
+  justify-content: center;
+}
+body.no-identity .pick-dept-label {
+  text-align: right;
+}
+
+/* Tweak the View Transitions duration & easing */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 0.5s;
+  animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+}
+::view-transition-old(hero-brand),
+::view-transition-new(hero-brand),
+::view-transition-old(hero-id),
+::view-transition-new(hero-id),
+::view-transition-old(identity-bar),
+::view-transition-new(identity-bar) {
+  animation-duration: 0.5s;
+  animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+}
