@@ -1032,3 +1032,118 @@ h1, h2, h3, h4 { margin: 0; font-weight: 600; }
 
 /* Add bottom padding so footer/grid don't hide behind the bar when visible */
 body.has-pending { padding-bottom: 72px; }
+
+/* ---------- Mini-months strip (other months at a glance) ---------- */
+.mini-strip { padding: 8px 0 80px; }
+.mini-strip-title {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink-3);
+  margin: 0 0 14px;
+  letter-spacing: 0.02em;
+}
+.mini-strip-title::before {
+  content: "—";
+  color: var(--gold);
+  font-style: normal;
+  margin-right: 8px;
+  font-weight: 400;
+}
+.mini-months {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 14px;
+}
+.mini-month {
+  background: var(--surface);
+  border: 1px solid var(--line-1);
+  border-radius: var(--r-md);
+  padding: 12px 14px;
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  transition: border-color .12s ease, transform .12s ease, box-shadow .12s ease;
+}
+.mini-month:hover {
+  border-color: var(--navy);
+  transform: translateY(-2px);
+  box-shadow: var(--sh-2);
+}
+.mini-month-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--line-1);
+}
+.mini-month-name {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ink-1);
+  letter-spacing: -0.01em;
+}
+.mini-month-year { font-size: 10.5px; color: var(--ink-3); font-weight: 500; }
+.mini-weekdays {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+  font-size: 7.5px;
+  color: var(--ink-3);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  text-align: center;
+  margin-bottom: 3px;
+  padding-bottom: 2px;
+}
+.mini-days {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+}
+.mini-day {
+  aspect-ratio: 1 / 1;
+  border-radius: 3px;
+  background: transparent;
+  position: relative;
+  font-size: 8.5px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ink-2);
+  font-family: var(--font-display);
+  font-variation-settings: "opsz" 18;
+}
+.mini-day.empty { visibility: hidden; }
+.mini-day.weekend { background: var(--weekend-tint); color: var(--ink-3); }
+.mini-day.holiday { background: var(--holiday-tint); color: var(--gold-2); }
+.mini-day.today {
+  outline: 1px solid var(--navy);
+  outline-offset: -1px;
+  color: var(--navy);
+  font-weight: 700;
+}
+.mini-day.has-people {
+  background: var(--mini-color, var(--ink-3));
+  color: white;
+  font-weight: 600;
+}
+.mini-day.has-people.weekend { color: white; }
+.mini-day.has-people.holiday { color: white; }
+.mini-day.conflict::before {
+  content: "";
+  position: absolute;
+  top: 0; right: 0;
+  width: 0; height: 0;
+  border-style: solid;
+  border-width: 0 4px 4px 0;
+  border-color: transparent var(--danger) transparent transparent;
+  pointer-events: none;
+}

@@ -88,6 +88,7 @@ async function pullFromBin() {
     // Persist a fresh local backup so reloads survive offline
     try { localStorage.setItem(BACKUP_KEY, JSON.stringify(serializeSelections())); } catch(e){}
     renderActiveMonth();
+    renderMiniMonths();
     renderSummary();
     renderFilterList();
     renderPendingBar();
@@ -365,6 +366,7 @@ function renderMonthNav() {
       saveState();
       renderActiveMonth();
       renderMonthNav();
+      renderMiniMonths();
     });
     tabs.appendChild(btn);
   }
@@ -382,6 +384,7 @@ function stepMonth(delta) {
   saveState();
   renderActiveMonth();
   renderMonthNav();
+  renderMiniMonths();
 }
 
 /* ============================================================
@@ -590,10 +593,95 @@ function renderSummary() {
 /* ============================================================
    Render all
    ============================================================ */
+
+
+function renderMiniMonths() {
+  const container = document.getElementById("mini-months");
+  if (!container) return;
+  container.innerHTML = "";
+  const today = todayIso();
+
+  for (const m of MONTHS) {
+    if (m === state.activeMonth) continue; // skip the active one — it's the big view above
+
+    const card = document.createElement("button");
+    card.className = "mini-month";
+    card.title = "Open " + MONTH_NAMES[m];
+    card.addEventListener("click", () => {
+      state.activeMonth = m;
+      saveState();
+      renderActiveMonth();
+      renderMonthNav();
+      renderMiniMonths();
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    });
+
+    const head = document.createElement("div");
+    head.className = "mini-month-head";
+    head.innerHTML = '<span class="mini-month-name">' + MONTH_NAMES[m] + '</span>'
+                   + '<span class="mini-month-year">' + YEAR + '</span>';
+    card.appendChild(head);
+
+    const wd = document.createElement("div");
+    wd.className = "mini-weekdays";
+    for (const lbl of WEEKDAY_SHORT) {
+      const c = document.createElement("div");
+      c.textContent = lbl;
+      wd.appendChild(c);
+    }
+    card.appendChild(wd);
+
+    const grid = document.createElement("div");
+    grid.className = "mini-days";
+
+    const lead = weekdayMon0(YEAR, m, 1);
+    for (let i = 0; i < lead; i++) {
+      const empty = document.createElement("div");
+      empty.className = "mini-day empty";
+      grid.appendChild(empty);
+    }
+
+    const dim = daysInMonth(YEAR, m);
+    for (let d = 1; d <= dim; d++) {
+      const dateStr = isoDate(YEAR, m, d);
+      const w = weekdayMon0(YEAR, m, d);
+      const isWE = w >= 5;
+      const isHoliday = !!HOLIDAYS[dateStr];
+
+      const cell = document.createElement("div");
+      cell.className = "mini-day";
+      if (isWE) cell.classList.add("weekend");
+      if (isHoliday) cell.classList.add("holiday");
+      if (dateStr === today) cell.classList.add("today");
+
+      const here = [];
+      for (const emp of EMPLOYEES) {
+        if (!state.visible.has(emp.id)) continue;
+        if ((state.selections[emp.id] || new Set()).has(dateStr)) here.push(emp);
+      }
+      const byDept = {};
+      for (const emp of here) byDept[emp.dept] = (byDept[emp.dept] || 0) + 1;
+      if (Object.values(byDept).some(n => n >= 2)) cell.classList.add("conflict");
+
+      if (here.length > 0) {
+        cell.classList.add("has-people");
+        const primary = here.find(e => e.id === state.me) || here[0];
+        cell.style.setProperty("--mini-color", primary.color);
+      }
+
+      cell.textContent = d;
+      grid.appendChild(cell);
+    }
+    card.appendChild(grid);
+    container.appendChild(card);
+  }
+}
+
 function renderAll() {
   renderIdentityBar();
   renderMonthNav();
   renderActiveMonth();
+  renderMiniMonths();
   renderFilterList();
   renderSummary();
   renderPendingBar();
