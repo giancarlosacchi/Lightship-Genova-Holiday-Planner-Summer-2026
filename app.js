@@ -55,7 +55,8 @@ const BIN_ID = "69faf63daaba882197790bd2";
 const MASTER_KEY = "$2a$10$txdqQgqRVzUpf12srsah2OTqg0BQcIkEr9eLydRN1lWXk4Bw2SCtu";
 const BIN_URL = "https://api.jsonbin.io/v3/b/" + BIN_ID;
 const POLL_INTERVAL_MS = 10000;     // pull every 10s
-const PUSH_DEBOUNCE_MS = 800;       // debounce writes by 800ms
+const PUSH_DEBOUNCE_MS = 250;       // near-instant write
+const BACKUP_KEY = "lightship-holiday-planner-v3-data";
 
 let lastRemoteUpdatedAt = "";
 let pushTimer = null;
@@ -194,12 +195,18 @@ function loadState() {
 
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return;
-    const obj = JSON.parse(raw);
-    if (obj && obj.me && EMP_BY_ID[obj.me]) state.me = obj.me;
-    if (obj && obj.selections) applySerializedSelections(obj.selections);
-    if (obj && Array.isArray(obj.visible)) state.visible = new Set(obj.visible.filter(id => EMP_BY_ID[id]));
-    if (obj && typeof obj.activeMonth === "number" && MONTHS.includes(obj.activeMonth)) state.activeMonth = obj.activeMonth;
+    if (raw) {
+      const obj = JSON.parse(raw);
+      if (obj && obj.me && EMP_BY_ID[obj.me]) state.me = obj.me;
+      if (obj && Array.isArray(obj.visible)) state.visible = new Set(obj.visible.filter(id => EMP_BY_ID[id]));
+      if (obj && typeof obj.activeMonth === "number" && MONTHS.includes(obj.activeMonth)) state.activeMonth = obj.activeMonth;
+    }
+    // Full data backup — restore selections so the screen isn't blank if pull fails
+    const backup = localStorage.getItem(BACKUP_KEY);
+    if (backup) {
+      const sel = JSON.parse(backup);
+      applySerializedSelections(sel);
+    }
   } catch (e) { console.warn("Could not load state", e); }
 }
 
@@ -218,15 +225,17 @@ function serializeSelections() {
   return out;
 }
 function saveState() {
-  // Local persistence — only personal preferences (identity, month, filter)
+  // Personal preferences
   const local = {
     me: state.me, activeMonth: state.activeMonth,
     visible: Array.from(state.visible),
   };
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(local));
+    // Full data backup (used if remote pull fails or before first sync)
+    localStorage.setItem(BACKUP_KEY, JSON.stringify(serializeSelections()));
   } catch (e) { /* ignore */ }
-  // Auto-save to shared backend (debounced)
+  // Auto-save to shared backend (debounced ~250ms)
   schedulePush();
 }
 
@@ -728,6 +737,24 @@ function init() {
     if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA") return;
     if (e.key === "ArrowLeft") stepMonth(-1);
     else if (e.key === "ArrowRight") stepMonth(1);
+  });
+
+  // If user closes/reloads tab while a push is pending, fire it synchronously
+  window.addEventListener("beforeunload", () => {
+    if (!pushTimer) return;
+    clearTimeout(pushTimer); pushTimer = null;
+    try {
+      const merged = serializeSelections();
+      const payload = JSON.stringify({ selections: merged, updatedAt: new Date().toISOString() });
+      const blob = new Blob([payload], { type: "application/json" });
+      // sendBeacon doesn't allow custom headers; use keepalive fetch instead
+      fetch(BIN_URL, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", "X-Master-Key": MASTER_KEY },
+        body: payload,
+        keepalive: true
+      });
+    } catch (e) { /* best effort */ }
   });
 
   document.querySelectorAll("[data-admin]").forEach(el => { el.hidden = !ADMIN_MODE; });
