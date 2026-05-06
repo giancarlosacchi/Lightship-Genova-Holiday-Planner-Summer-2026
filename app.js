@@ -46,6 +46,7 @@ const EMP_BY_ID = Object.fromEntries(EMPLOYEES.map(e => [e.id, e]));
 const URL_PARAMS = new URLSearchParams(location.search);
 const ADMIN_MODE = URL_PARAMS.get("admin") === "1";
 const STORAGE_KEY = "lightship-holiday-planner-v3";
+const ADMIN_PASSWORD = "lightship2026"; // change this if needed
 
 /* ============================================================
    REMOTE BACKEND (JSONBin.io) — shared selections for everyone
@@ -279,6 +280,9 @@ function renderIdentityBar() {
   container.appendChild(wrap);
 
   document.getElementById("btn-switch-user").addEventListener("click", () => {
+    const pwd = prompt("Admin password to switch user:");
+    if (pwd === null) return;
+    if (pwd !== ADMIN_PASSWORD) { alert("Wrong password."); return; }
     if (!confirm("Switch user? Your holidays stay saved in this browser.")) return;
     state.me = null;
     saveState();
@@ -449,20 +453,52 @@ function renderActiveMonth() {
 function renderFilterList() {
   const container = document.getElementById("filter-list");
   container.innerHTML = "";
-  for (const emp of EMPLOYEES) {
-    const chip = document.createElement("button");
-    const on = state.visible.has(emp.id);
-    const isMe = emp.id === state.me;
-    chip.className = "filter-chip" + (on ? "" : " off") + (isMe ? " is-me" : "");
-    chip.title = on ? "Hide on calendar" : "Show on calendar";
-    chip.innerHTML = '<span class="swatch" style="background:' + emp.color + '"></span>' + emp.id + (isMe ? " · you" : "");
-    chip.addEventListener("click", () => {
-      if (on) state.visible.delete(emp.id); else state.visible.add(emp.id);
+
+  for (const dept of DEPARTMENTS) {
+    const block = document.createElement("div");
+    block.className = "filter-dept-block";
+
+    // department header — click to toggle whole dept
+    const allOn = dept.members.every(id => state.visible.has(id));
+    const anyOn = dept.members.some(id => state.visible.has(id));
+    const head = document.createElement("button");
+    head.className = "filter-dept-head" + (allOn ? " all-on" : (anyOn ? " some-on" : " all-off"));
+    head.title = allOn ? "Hide whole department" : "Show whole department";
+    head.innerHTML = '<span class="filter-dept-name">' + dept.name + '</span>'
+                   + '<span class="filter-dept-toggle">' + (allOn ? "all" : (anyOn ? "some" : "none")) + '</span>';
+    head.addEventListener("click", () => {
+      if (allOn) {
+        for (const id of dept.members) state.visible.delete(id);
+      } else {
+        for (const id of dept.members) state.visible.add(id);
+      }
       saveState();
       renderActiveMonth();
       renderFilterList();
     });
-    container.appendChild(chip);
+    block.appendChild(head);
+
+    // employee chips for the dept
+    const row = document.createElement("div");
+    row.className = "filter-row";
+    for (const id of dept.members) {
+      const emp = EMP_BY_ID[id];
+      const chip = document.createElement("button");
+      const on = state.visible.has(id);
+      const isMe = id === state.me;
+      chip.className = "filter-chip" + (on ? "" : " off") + (isMe ? " is-me" : "");
+      chip.title = on ? "Hide on calendar" : "Show on calendar";
+      chip.innerHTML = '<span class="swatch" style="background:' + emp.color + '"></span>' + emp.id + (isMe ? " · you" : "");
+      chip.addEventListener("click", () => {
+        if (on) state.visible.delete(id); else state.visible.add(id);
+        saveState();
+        renderActiveMonth();
+        renderFilterList();
+      });
+      row.appendChild(chip);
+    }
+    block.appendChild(row);
+    container.appendChild(block);
   }
 }
 

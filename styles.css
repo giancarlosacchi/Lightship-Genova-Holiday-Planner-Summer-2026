@@ -925,3 +925,47 @@ h1, h2, h3, h4 { margin: 0; font-weight: 600; }
   .grid-scroll { overflow-x: auto; }
   .grid { min-width: 560px; }
 }
+
+/* ---------- Filter — department blocks ---------- */
+.filter-dept-block { margin-bottom: 12px; }
+.filter-dept-block:last-child { margin-bottom: 0; }
+.filter-dept-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  background: var(--surface-2);
+  border: 1px solid var(--line-1);
+  border-radius: 8px;
+  padding: 6px 10px;
+  margin-bottom: 6px;
+  cursor: pointer;
+  transition: all .12s ease;
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: 13px;
+  color: var(--ink-1);
+}
+.filter-dept-head:hover { background: var(--surface-3); border-color: var(--line-2); }
+.filter-dept-head .filter-dept-name { font-weight: 500; }
+.filter-dept-head .filter-dept-toggle {
+  font-family: var(--font-sans);
+  font-style: normal;
+  font-size: 9.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--ink-3);
+  border: 1px solid var(--line-1);
+}
+.filter-dept-head.all-on .filter-dept-toggle {
+  color: white; background: var(--navy); border-color: var(--navy);
+}
+.filter-dept-head.some-on .filter-dept-toggle {
+  color: var(--gold-2); background: rgba(200, 145, 50, 0.12); border-color: var(--line-gold);
+}
+.filter-dept-head.all-off { opacity: 0.55; }
+.filter-row { display: flex; flex-wrap: wrap; gap: 5px; padding-left: 4px; }
