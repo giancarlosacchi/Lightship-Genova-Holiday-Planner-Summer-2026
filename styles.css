@@ -933,11 +933,12 @@ h1, h2, h3, h4 { margin: 0; font-weight: 600; }
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 16px;
   width: 100%;
   background: var(--surface-2);
   border: 1px solid var(--line-1);
   border-radius: 8px;
-  padding: 6px 10px;
+  padding: 6px 12px;
   margin-bottom: 6px;
   cursor: pointer;
   transition: all .12s ease;
@@ -955,12 +956,15 @@ h1, h2, h3, h4 { margin: 0; font-weight: 600; }
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.1em;
-  padding: 2px 7px;
+  padding: 2px 8px;
   border-radius: 999px;
   background: var(--surface);
   color: var(--ink-3);
   border: 1px solid var(--line-1);
+  margin-left: auto;
+  flex: 0 0 auto;
 }
+.filter-dept-head .filter-dept-name { flex: 1 1 auto; }
 .filter-dept-head.all-on .filter-dept-toggle {
   color: white; background: var(--navy); border-color: var(--navy);
 }
