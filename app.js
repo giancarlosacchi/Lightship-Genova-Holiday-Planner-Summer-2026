@@ -6,14 +6,14 @@
 const YEAR = 2026;
 const MONTHS = [4, 5, 6, 7, 8];
 
-const MONTH_NAMES = ["Gennaio","Febbraio","Marzo","Aprile","Maggio","Giugno","Luglio","Agosto","Settembre","Ottobre","Novembre","Dicembre"];
-const MONTH_SHORT = ["Gen","Feb","Mar","Apr","Mag","Giu","Lug","Ago","Set","Ott","Nov","Dic"];
-const WEEKDAY_LABELS = ["Lun","Mar","Mer","Gio","Ven","Sab","Dom"];
-const WEEKDAY_SHORT = ["L","M","M","G","V","S","D"];
+const MONTH_NAMES = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+const MONTH_SHORT = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+const WEEKDAY_LABELS = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
+const WEEKDAY_SHORT = ["M","T","W","T","F","S","S"];
 
 const HOLIDAYS = {
-  "2026-05-01": "Festa del Lavoro",
-  "2026-06-02": "Festa della Repubblica",
+  "2026-05-01": "Labour Day",
+  "2026-06-02": "Republic Day",
   "2026-08-15": "Ferragosto"
 };
 
@@ -72,10 +72,10 @@ function loadState() {
           if (typeof local.activeMonth === "number" && MONTHS.includes(local.activeMonth)) state.activeMonth = local.activeMonth;
         }
         const empIds = Object.keys(obj.selections).filter(id => EMP_BY_ID[id]);
-        if (empIds.length && confirm("Importare le ferie per: " + empIds.join(", ") + "?\nLe voci esistenti per queste persone verranno sostituite.")) {
+        if (empIds.length && confirm("Import holidays for: " + empIds.join(", ") + "?\nThis replaces any existing entries for them.")) {
           for (const empId of empIds) state.selections[empId] = new Set(obj.selections[empId]);
           saveState();
-          showToast("Importate: " + empIds.join(", "));
+          showToast("Imported " + empIds.join(", "));
         }
         history.replaceState(null, "", location.pathname + location.search);
         return;
@@ -117,9 +117,9 @@ function saveState() {
   };
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
-    setStatus("salvato alle " + new Date().toLocaleTimeString());
+    setStatus("saved at " + new Date().toLocaleTimeString());
   } catch (e) {
-    setStatus("impossibile salvare (memoria piena?)");
+    setStatus("could not save (storage full?)");
   }
 }
 
@@ -150,7 +150,7 @@ function renderIdentityBar() {
 
     const prompt = document.createElement("p");
     prompt.className = "pick-prompt";
-    prompt.textContent = "Benvenuto a bordo. Chi pianifica oggi?";
+    prompt.textContent = "Welcome aboard. Who's planning today?";
     wrap.appendChild(prompt);
 
     for (const dept of DEPARTMENTS) {
@@ -171,7 +171,7 @@ function renderIdentityBar() {
           state.visible.add(emp.id);
           saveState();
           renderAll();
-          showToast("Benvenuto, " + emp.id);
+          showToast("Welcome, " + emp.id);
         });
         row.appendChild(chip);
       }
@@ -188,11 +188,11 @@ function renderIdentityBar() {
     '<div class="id-block" style="--me-color:' + me.color + '">' +
       '<span class="identity-swatch" style="background:' + me.color + '"></span>' +
       '<div>' +
-        '<span class="identity-name">Sei<strong>' + me.id + '</strong></span>' +
+        '<span class="identity-name">You<strong>' + me.id + '</strong></span>' +
         '<div class="identity-dept">' + me.deptName + '</div>' +
       '</div>' +
     '</div>' +
-    '<p class="identity-tip">Clicca una cella sulla tua riga per segnare un giorno di ferie.</p>' +
+    '<p class="identity-tip">Click a cell on your row to mark it as a holiday.</p>' +
     '<div class="identity-actions">' +
       '<button id="btn-switch-user" class="chip-btn">Switch user</button>' +
       '<button id="btn-clear-mine" class="chip-btn" style="color:#c1422d;border-color:rgba(193,66,45,0.32)">Clear my holidays</button>' +
@@ -200,17 +200,17 @@ function renderIdentityBar() {
   container.appendChild(wrap);
 
   document.getElementById("btn-switch-user").addEventListener("click", () => {
-    if (!confirm("Cambiare utente? Le tue ferie restano salvate in questo browser.")) return;
+    if (!confirm("Switch user? Your holidays stay saved in this browser.")) return;
     state.me = null;
     saveState();
     renderAll();
   });
   document.getElementById("btn-clear-mine").addEventListener("click", () => {
-    if (!confirm("Cancellare tutte le ferie di " + me.id + "?")) return;
+    if (!confirm("Clear all of " + me.id + "'s holidays?")) return;
     state.selections[me.id] = new Set();
     saveState();
     renderAll();
-    showToast("Ferie cancellate");
+    showToast("Your holidays cleared");
   });
 }
 
@@ -348,14 +348,14 @@ function renderActiveMonth() {
 
         if (isMe && !isWE && !isHoliday) {
           cell.classList.add("editable");
-          cell.title = "Attiva/disattiva ferie il " + dateStr;
+          cell.title = "Toggle holiday on " + dateStr;
           cell.addEventListener("click", () => {
             toggleDay(state.me, dateStr);
             renderActiveMonth();
             renderSummary();
           });
         } else {
-          cell.title = emp.id + " — " + dateStr + (off ? " — ferie" : "");
+          cell.title = emp.id + " — " + dateStr + (off ? " — off" : "");
         }
 
         grid.appendChild(cell);
@@ -375,8 +375,8 @@ function renderFilterList() {
     const on = state.visible.has(emp.id);
     const isMe = emp.id === state.me;
     chip.className = "filter-chip" + (on ? "" : " off") + (isMe ? " is-me" : "");
-    chip.title = on ? "Nascondi dal calendario" : "Mostra sul calendario";
-    chip.innerHTML = '<span class="swatch" style="background:' + emp.color + '"></span>' + emp.id + (isMe ? " · tu" : "");
+    chip.title = on ? "Hide on calendar" : "Show on calendar";
+    chip.innerHTML = '<span class="swatch" style="background:' + emp.color + '"></span>' + emp.id + (isMe ? " · you" : "");
     chip.addEventListener("click", () => {
       if (on) state.visible.delete(emp.id); else state.visible.add(emp.id);
       saveState();
@@ -404,13 +404,13 @@ function renderSummary() {
     row.innerHTML =
       '<span class="label">' +
         '<span class="swatch" style="background:' + emp.color + '"></span>' + emp.id +
-        (isMe ? ' <span style="color:#8a8475;font-weight:400;font-size:11px">· tu</span>' : '') +
+        (isMe ? ' <span style="color:#8a8475;font-weight:400;font-size:11px">· you</span>' : '') +
       '</span>' +
-      '<span class="count">' + count + ' g</span>';
+      '<span class="count">' + count + ' d</span>';
     container.appendChild(row);
   }
   if (!any) {
-    container.innerHTML = '<p class="summary-empty">— nessuna ferie pianificata.</p>';
+    container.innerHTML = '<p class="summary-empty">— no holidays planned yet.</p>';
   } else {
     const totalRow = document.createElement("div");
     totalRow.className = "summary-row";
@@ -418,7 +418,7 @@ function renderSummary() {
     totalRow.style.borderTop = "1px solid rgba(15,20,25,0.06)";
     totalRow.style.paddingTop = "8px";
     totalRow.style.fontWeight = "600";
-    totalRow.innerHTML = '<span class="label">Totale</span><span class="count">' + total + ' g</span>';
+    totalRow.innerHTML = '<span class="label">Total</span><span class="count">' + total + ' d</span>';
     container.appendChild(totalRow);
   }
 }
@@ -460,7 +460,7 @@ function showToast(msg) {
    Top-bar actions
    ============================================================ */
 function exportMine() {
-  if (!state.me) { showToast("Scegli prima chi sei"); return; }
+  if (!state.me) { showToast("Choose who you are first"); return; }
   const sel = {};
   sel[state.me] = Array.from(state.selections[state.me] || new Set()).sort();
   downloadJson({ app:"lightship-holiday-planner", version:3, year:YEAR, exportedBy:state.me, exportedAt:new Date().toISOString(), selections:sel },
@@ -477,30 +477,30 @@ function downloadJson(payload, filename) {
   a.href = url; a.download = filename;
   document.body.appendChild(a); a.click(); a.remove();
   URL.revokeObjectURL(url);
-  showToast("Esportato " + filename);
+  showToast("Exported " + filename);
 }
 function importJson(file) {
   const reader = new FileReader();
   reader.onload = () => {
     try {
       const obj = JSON.parse(reader.result);
-      if (!obj || !obj.selections) throw new Error("Selezioni mancanti");
+      if (!obj || !obj.selections) throw new Error("Missing selections");
       const empIds = Object.keys(obj.selections).filter(id => EMP_BY_ID[id]);
-      if (!empIds.length) { alert("Nessun dipendente conosciuto nel file."); return; }
-      const msg = "Importare le ferie per: " + empIds.join(", ") + "?\nLe voci esistenti per queste persone verranno sostituite. Le altre persone restano invariate.";
+      if (!empIds.length) { alert("No known employees in that file."); return; }
+      const msg = "Import holidays for: " + empIds.join(", ") + "?\nThis will replace any existing entries for them. Other people are kept as-is.";
       if (!confirm(msg)) return;
       for (const empId of empIds) state.selections[empId] = new Set(obj.selections[empId]);
       saveState();
       renderAll();
-      showToast("Importate: " + empIds.join(", "));
+      showToast("Imported " + empIds.join(", "));
     } catch (e) {
-      alert("Impossibile importare il file: " + e.message);
+      alert("Could not import file: " + e.message);
     }
   };
   reader.readAsText(file);
 }
 function shareMyLink() {
-  if (!state.me) { showToast("Scegli prima chi sei"); return; }
+  if (!state.me) { showToast("Choose who you are first"); return; }
   const sel = {};
   sel[state.me] = Array.from(state.selections[state.me] || new Set()).sort();
   const json = JSON.stringify({ selections: sel });
@@ -508,11 +508,11 @@ function shareMyLink() {
   const url = location.origin + location.pathname + "#data=" + encodeURIComponent(b64);
   if (navigator.clipboard) {
     navigator.clipboard.writeText(url).then(
-      () => showToast("Link di condivisione copiato negli appunti"),
-      () => prompt("Copia questo link:", url)
+      () => showToast("Your share link is in the clipboard"),
+      () => prompt("Copy this link:", url)
     );
   } else {
-    prompt("Copia questo link:", url);
+    prompt("Copy this link:", url);
   }
 }
 
@@ -535,11 +535,11 @@ function init() {
   });
   document.getElementById("btn-share").addEventListener("click", shareMyLink);
   document.getElementById("btn-reset").addEventListener("click", () => {
-    if (!confirm("Cancellare TUTTE le ferie di TUTTI in questo browser? Operazione admin.")) return;
+    if (!confirm("Clear ALL holidays for EVERYONE in this browser? This is admin-level.")) return;
     state.selections = {};
     saveState();
     renderAll();
-    showToast("Tutto cancellato");
+    showToast("Everything cleared");
   });
 
   document.getElementById("month-prev").addEventListener("click", () => stepMonth(-1));
@@ -555,7 +555,7 @@ function init() {
   });
   document.getElementById("filter-mine").addEventListener("click", () => {
     if (state.me) state.visible = new Set([state.me]);
-    else showToast("Scegli prima chi sei");
+    else showToast("Choose who you are first");
     saveState(); renderActiveMonth(); renderFilterList();
   });
 
@@ -566,7 +566,7 @@ function init() {
   });
 
   document.querySelectorAll("[data-admin]").forEach(el => { el.hidden = !ADMIN_MODE; });
-  setStatus("pronto");
+  setStatus("ready");
 }
 
 document.addEventListener("DOMContentLoaded", init);
