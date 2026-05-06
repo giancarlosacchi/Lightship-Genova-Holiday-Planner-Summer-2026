@@ -75,7 +75,7 @@ async function pullFromBin() {
     let mergedMine = false;
     for (const [empId, dates] of Object.entries(record.selections)) {
       if (!EMP_BY_ID[empId]) continue;
-      if (empId === state.me && hasPendingChanges()) continue; // user has unsaved edits
+      if (empId === state.me && pushTimer) continue; // local pending push in progress
       state.selections[empId] = new Set(dates);
       if (empId === state.me) mergedMine = true;
     }
@@ -226,6 +226,8 @@ function saveState() {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(local));
   } catch (e) { /* ignore */ }
+  // Auto-save to shared backend (debounced)
+  schedulePush();
 }
 
 /* ============================================================
@@ -579,20 +581,7 @@ function renderAll() {
 
 function renderPendingBar() {
   const bar = document.getElementById("pending-bar");
-  const summary = document.getElementById("pending-summary");
-  if (!bar) return;
-  if (!hasPendingChanges()) { bar.hidden = true; return; }
-  // Count net changes
-  const cur = new Set(snapshotMine());
-  const saved = new Set(state.savedMineDates);
-  let added = 0, removed = 0;
-  for (const d of cur) if (!saved.has(d)) added++;
-  for (const d of saved) if (!cur.has(d)) removed++;
-  const parts = [];
-  if (added)   parts.push(added + " added");
-  if (removed) parts.push(removed + " removed");
-  summary.textContent = "Unsaved changes — " + parts.join(", ");
-  bar.hidden = false;
+  if (bar) bar.hidden = true; // auto-save mode — bar disabled
 }
 
 /* ============================================================
