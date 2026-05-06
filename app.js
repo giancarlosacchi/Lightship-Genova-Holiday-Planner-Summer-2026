@@ -59,9 +59,13 @@ const PUSH_DEBOUNCE_MS = 250;       // near-instant write
 const BACKUP_KEY = "lightship-holiday-planner-v3-data";
 
 let lastRemoteUpdatedAt = "";
-let pushTimer = null;
+let pushTimer = null;          // legacy field, kept for pull compatibility
+let pushInProgress = false;    // a save is currently in flight
+let pushPendingAgain = false;  // user clicked again while a save was in flight
 
 async function pullFromBin() {
+  // Don't refresh while a save is in flight — would race with our local state
+  if (pushInProgress) return;
   try {
     const resp = await fetch(BIN_URL + "/latest", {
       headers: { "X-Master-Key": MASTER_KEY, "X-Bin-Meta": "false" }
@@ -72,17 +76,17 @@ async function pullFromBin() {
     if (!record || !record.selections) return;
     if (record.updatedAt && record.updatedAt === lastRemoteUpdatedAt) return; // unchanged
     lastRemoteUpdatedAt = record.updatedAt || new Date().toISOString();
-    // Merge remote into state, but never overwrite OUR row mid-edit
+    // Merge remote into state. Never overwrite OUR row if we have unsaved local edits.
     let mergedMine = false;
     for (const [empId, dates] of Object.entries(record.selections)) {
       if (!EMP_BY_ID[empId]) continue;
-      if (empId === state.me && pushTimer) continue; // local pending push in progress
+      if (empId === state.me && hasPendingChanges()) continue;
       state.selections[empId] = new Set(dates);
       if (empId === state.me) mergedMine = true;
     }
-    // If we merged our own row from remote, sync the "saved" snapshot so the
-    // pending-bar doesn't show false positives at startup.
     if (mergedMine || !state.me) setSavedMine();
+    // Persist a fresh local backup so reloads survive offline
+    try { localStorage.setItem(BACKUP_KEY, JSON.stringify(serializeSelections())); } catch(e){}
     renderActiveMonth();
     renderSummary();
     renderFilterList();
@@ -94,8 +98,12 @@ async function pullFromBin() {
 }
 
 async function pushToBin() {
+  // Serialize: if a save is already running, mark that another is needed and bail
+  if (pushInProgress) { pushPendingAgain = true; return; }
+  pushInProgress = true;
+  setStatus("saving…");
   try {
-    // Read latest first, then overwrite ONLY our row
+    // Read-merge-write: read latest then overwrite only our row (other rows preserved)
     const r = await fetch(BIN_URL + "/latest", {
       headers: { "X-Master-Key": MASTER_KEY, "X-Bin-Meta": "false" }
     });
@@ -108,7 +116,6 @@ async function pushToBin() {
     if (state.me) {
       merged[state.me] = Array.from(state.selections[state.me] || new Set()).sort();
     } else {
-      // even without identity, push everything we know
       for (const [k, v] of Object.entries(state.selections)) merged[k] = Array.from(v).sort();
     }
     const payload = { selections: merged, updatedAt: new Date().toISOString() };
@@ -120,23 +127,25 @@ async function pushToBin() {
     if (resp.ok) {
       lastRemoteUpdatedAt = payload.updatedAt;
       setSavedMine();
-      renderPendingBar();
+      try { localStorage.setItem(BACKUP_KEY, JSON.stringify(serializeSelections())); } catch(e){}
       setStatus("saved " + new Date().toLocaleTimeString());
     } else {
       setStatus("save failed (" + resp.status + ")");
     }
   } catch (e) {
     setStatus("save failed (network)");
+  } finally {
+    pushInProgress = false;
+    // If user clicked while we were saving, save again
+    if (pushPendingAgain) {
+      pushPendingAgain = false;
+      pushToBin();
+    }
   }
 }
 
-function schedulePush() {
-  if (pushTimer) clearTimeout(pushTimer);
-  pushTimer = setTimeout(() => {
-    pushTimer = null;
-    pushToBin();
-  }, PUSH_DEBOUNCE_MS);
-}
+// Save now — no debounce
+function schedulePush() { pushToBin(); }
 
 const state = {
   me: null,
