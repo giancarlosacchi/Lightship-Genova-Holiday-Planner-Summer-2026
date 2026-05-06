@@ -523,18 +523,18 @@ function init() {
   loadState();
   renderAll();
 
-  document.getElementById("btn-export").addEventListener("click", exportMine);
-  document.getElementById("btn-export-all").addEventListener("click", exportAll);
-  document.getElementById("btn-import").addEventListener("click", () => {
-    document.getElementById("file-import").click();
+  document.getElementById("btn-export")?.addEventListener("click", exportMine);
+  document.getElementById("btn-export-all")?.addEventListener("click", exportAll);
+  document.getElementById("btn-import")?.addEventListener("click", () => {
+    document.getElementById("file-import")?.click();
   });
-  document.getElementById("file-import").addEventListener("change", (e) => {
+  document.getElementById("file-import")?.addEventListener("change", (e) => {
     const f = e.target.files && e.target.files[0];
     if (f) importJson(f);
     e.target.value = "";
   });
-  document.getElementById("btn-share").addEventListener("click", shareMyLink);
-  document.getElementById("btn-reset").addEventListener("click", () => {
+  document.getElementById("btn-share")?.addEventListener("click", shareMyLink);
+  document.getElementById("btn-reset")?.addEventListener("click", () => {
     if (!confirm("Clear ALL holidays for EVERYONE in this browser? This is admin-level.")) return;
     state.selections = {};
     saveState();
