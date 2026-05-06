@@ -238,8 +238,10 @@ h1, h2, h3, h4 { margin: 0; font-weight: 600; }
 .pick-identity {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 18px;
   padding: 4px 0;
+  align-items: center;       /* center the prompt and each row */
+  text-align: center;
 }
 .pick-prompt {
   font-family: var(--font-display);
@@ -249,6 +251,7 @@ h1, h2, h3, h4 { margin: 0; font-weight: 600; }
   color: var(--ink-1);
   margin: 0 0 6px;
   letter-spacing: -0.02em;
+  text-align: center;
 }
 .pick-prompt::before {
   content: "—";
@@ -257,16 +260,25 @@ h1, h2, h3, h4 { margin: 0; font-weight: 600; }
   font-style: normal;
   font-weight: 400;
 }
-.pick-row { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.pick-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;   /* center the chips on each row */
+  gap: 10px 12px;
+  width: 100%;
+}
 .pick-dept-label {
   font-size: 10.5px;
   text-transform: uppercase;
   letter-spacing: 0.14em;
   color: var(--ink-3);
   font-weight: 600;
-  min-width: 150px;
   font-style: italic;
   font-family: var(--font-display);
+  text-align: center;
+  width: 100%;               /* dept label sits on its own centered line */
+  margin-bottom: 2px;
 }
 .emp-chip {
   display: inline-flex;
