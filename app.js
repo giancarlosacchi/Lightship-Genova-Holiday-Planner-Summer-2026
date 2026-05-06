@@ -665,8 +665,8 @@ function renderMiniMonths() {
 
       if (here.length > 0) {
         cell.classList.add("has-people");
-        const primary = here.find(e => e.id === state.me) || here[0];
-        cell.style.setProperty("--mini-color", primary.color);
+        // Heat-map by headcount: 1 = green, 2 = yellow, 3 = orange, 4+ = red
+        cell.classList.add("heat-" + Math.min(here.length, 4));
       }
 
       cell.textContent = d;

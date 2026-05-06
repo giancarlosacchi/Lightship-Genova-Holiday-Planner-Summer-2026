@@ -1147,3 +1147,47 @@ body.has-pending { padding-bottom: 72px; }
   border-color: transparent var(--danger) transparent transparent;
   pointer-events: none;
 }
+
+/* ---------- Mini-month heat-map (headcount per day) ---------- */
+.mini-strip-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin: 0 0 12px;
+  flex-wrap: wrap;
+}
+.mini-strip-head .mini-strip-title { margin: 0; }
+.mini-legend {
+  list-style: none;
+  margin: 0; padding: 0;
+  display: flex;
+  gap: 10px;
+  font-size: 11px;
+  color: var(--ink-3);
+  font-weight: 500;
+  letter-spacing: 0.02em;
+}
+.mini-legend li { display: inline-flex; align-items: center; gap: 5px; }
+.heat-swatch {
+  display: inline-block;
+  width: 12px; height: 12px;
+  border-radius: 3px;
+  flex: 0 0 auto;
+}
+.heat-swatch.heat-1, .mini-day.heat-1.has-people { background: #6ec27a; color: #173f1f; }  /* green */
+.heat-swatch.heat-2, .mini-day.heat-2.has-people { background: #f1c84b; color: #5a3d05; }  /* yellow */
+.heat-swatch.heat-3, .mini-day.heat-3.has-people { background: #ec894a; color: #4a1f08; }  /* orange */
+.heat-swatch.heat-4, .mini-day.heat-4.has-people { background: #d04036; color: #ffffff; }  /* red */
+
+/* Override the previous flat mini-day.has-people background so heat classes win */
+.mini-day.has-people { background: transparent; color: inherit; }
+.mini-day.has-people.heat-4 { color: #ffffff; }
+.mini-day.has-people.heat-3 { color: #4a1f08; }
+.mini-day.has-people.heat-2 { color: #5a3d05; }
+.mini-day.has-people.heat-1 { color: #173f1f; }
+
+/* Weekend/holiday tint should NOT win over the heat color when someone is off */
+.mini-day.has-people.weekend, .mini-day.has-people.holiday {
+  /* heat color already set above */
+}
