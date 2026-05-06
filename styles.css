@@ -1231,6 +1231,19 @@ body.no-identity .footer { display: none; }
    The smooth transition between those two layouts is handled in app.js using
    the Web Animations API with First-Last-Invert-Play. */
 
+/* When no identity yet: center the brand block in the hero. Keep the row layout
+   identical to the logged-in state so the FLIP animation is just a horizontal slide. */
+body.no-identity .hero-inner {
+  justify-content: center;
+  padding-bottom: 8px;
+}
+body.no-identity .hero-brand {
+  flex: 0 1 auto;        /* defeat flex: 1 from base rule */
+  min-width: 0;          /* defeat min-width: 260px from base rule */
+  width: max-content;    /* size strictly to content so justify-content: center works */
+  max-width: 100%;
+}
+
 /* Identity card slides in from the right when login happens */
 .hero-identity {
   opacity: 1;
@@ -1241,6 +1254,7 @@ body.no-identity .hero-identity {
   opacity: 0;
   transform: translateX(20px);
   pointer-events: none;
+  display: none !important;
 }
 
 /* App sections fade in after login */
