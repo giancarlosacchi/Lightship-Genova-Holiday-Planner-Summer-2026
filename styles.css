@@ -1033,8 +1033,8 @@ h1, h2, h3, h4 { margin: 0; font-weight: 600; }
 /* Add bottom padding so footer/grid don't hide behind the bar when visible */
 body.has-pending { padding-bottom: 72px; }
 
-/* ---------- Mini-months strip (other months at a glance) ---------- */
-.mini-strip { padding: 8px 0 80px; }
+/* ---------- Mini-months strip (other months — inside month-stage column) ---------- */
+.mini-strip { margin-top: 18px; }
 .mini-strip-title {
   font-family: var(--font-display);
   font-style: italic;
@@ -1053,8 +1053,8 @@ body.has-pending { padding-bottom: 72px; }
 }
 .mini-months {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 14px;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
 }
 .mini-month {
   background: var(--surface);
