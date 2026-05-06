@@ -1231,30 +1231,19 @@ body.no-identity .footer { display: none; }
 .hero-identity { view-transition-name: hero-id; }
 .identity-bar  { view-transition-name: identity-bar; }
 
-/* When NO identity is selected: hero is centered; picker fills the page */
+/* When NO identity is selected: brand is centered horizontally, but its INTERNAL layout
+   (row: mark left, text right) is identical to the logged-in state. This way the
+   View Transition captures the same shape in both states and only animates horizontal
+   position — true slide, no zoom. */
 body.no-identity .hero {
   padding: 64px 0 0;
 }
 body.no-identity .hero-inner {
-  flex-direction: column;
-  align-items: center;
-  text-align: center;
+  justify-content: center;
   padding-bottom: 24px;
 }
 body.no-identity .hero-brand {
-  flex-direction: column;
-  align-items: center;
-  gap: 14px;
-  text-align: center;
-}
-body.no-identity .hero-mark {
-  width: 64px; height: 64px;
-}
-body.no-identity .eyebrow {
-  justify-content: center;
-}
-body.no-identity .display {
-  font-size: clamp(40px, 6vw, 64px);
+  flex: 0 1 auto;
 }
 
 /* Picker: centered, generous spacing */
