@@ -1191,3 +1191,35 @@ body.has-pending { padding-bottom: 72px; }
 .mini-day.has-people.weekend, .mini-day.has-people.holiday {
   /* heat color already set above */
 }
+
+/* ---------- Hero compact identity (top-right after login) ---------- */
+.hero-identity { flex: 0 0 auto; padding-top: 4px; }
+.hero-id-block {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--surface);
+  border: 1px solid var(--line-1);
+  border-left: 3px solid var(--me-color, var(--navy));
+  border-radius: var(--r-md);
+  padding: 8px 10px 8px 8px;
+  box-shadow: var(--sh-1);
+}
+.hero-id-block .identity-swatch {
+  width: 32px; height: 32px; border-radius: 8px;
+  flex: 0 0 auto;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25);
+}
+.hero-id-block .hero-id-text { display: flex; flex-direction: column; min-width: 0; }
+.hero-id-block .identity-name { font-size: 10.5px; }
+.hero-id-block .identity-name strong { font-size: 16px; }
+.hero-id-block .identity-dept { font-size: 10.5px; }
+.hero-id-btn { margin-left: 4px; }
+
+/* When no identity — hide the rest of the app so the picker is the only thing visible */
+body.no-identity .month-meta,
+body.no-identity .main-grid,
+body.no-identity .footer { display: none; }
+
+/* Remove the conflict corner triangle from mini-days — heat-map color is enough */
+.mini-day.conflict::before { display: none; }

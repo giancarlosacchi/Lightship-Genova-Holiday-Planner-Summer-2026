@@ -272,9 +272,17 @@ function toggleDay(empId, dateStr) {
    ============================================================ */
 function renderIdentityBar() {
   const container = document.getElementById("dept-list");
+  const heroSlot  = document.getElementById("hero-identity");
+  const identityBar = document.querySelector(".identity-bar");
   container.innerHTML = "";
+  if (heroSlot) heroSlot.innerHTML = "";
 
   if (!state.me) {
+    // No identity yet — show only the picker (rest of the page is hidden via body class)
+    document.body.classList.add("no-identity");
+    if (heroSlot) heroSlot.hidden = true;
+    if (identityBar) identityBar.hidden = false;
+
     const wrap = document.createElement("div");
     wrap.className = "pick-identity";
 
@@ -311,40 +319,33 @@ function renderIdentityBar() {
     return;
   }
 
-  const me = EMP_BY_ID[state.me];
-  const wrap = document.createElement("div");
-  wrap.className = "identity-locked";
-  wrap.innerHTML =
-    '<div class="id-block" style="--me-color:' + me.color + '">' +
-      '<span class="identity-swatch" style="background:' + me.color + '"></span>' +
-      '<div>' +
-        '<span class="identity-name">You<strong>' + me.id + '</strong></span>' +
-        '<div class="identity-dept">' + me.deptName + '</div>' +
-      '</div>' +
-    '</div>' +
-    '<p class="identity-tip">Click a cell on your row to mark it as a holiday.</p>' +
-    '<div class="identity-actions">' +
-      '<button id="btn-switch-user" class="chip-btn">Switch user</button>' +
-      '<button id="btn-clear-mine" class="chip-btn" style="color:#c1422d;border-color:rgba(193,66,45,0.32)">Clear my holidays</button>' +
-    '</div>';
-  container.appendChild(wrap);
+  // Identity locked — hide the big bar, show compact card in the hero top-right
+  document.body.classList.remove("no-identity");
+  if (identityBar) identityBar.hidden = true;
 
-  document.getElementById("btn-switch-user").addEventListener("click", () => {
-    const pwd = prompt("Admin password to switch user:");
-    if (pwd === null) return;
-    if (pwd !== ADMIN_PASSWORD) { alert("Wrong password."); return; }
-    if (!confirm("Switch user? Your holidays stay saved in this browser.")) return;
-    state.me = null;
-    saveState();
-    renderAll();
-  });
-  document.getElementById("btn-clear-mine").addEventListener("click", () => {
-    if (!confirm("Clear all of " + me.id + "'s holidays?")) return;
-    state.selections[me.id] = new Set();
-    saveState();
-    renderAll();
-    showToast("Your holidays cleared");
-  });
+  const me = EMP_BY_ID[state.me];
+  if (heroSlot) {
+    heroSlot.hidden = false;
+    heroSlot.innerHTML =
+      '<div class="hero-id-block" style="--me-color:' + me.color + '">' +
+        '<span class="identity-swatch" style="background:' + me.color + '"></span>' +
+        '<div class="hero-id-text">' +
+          '<span class="identity-name">You<strong>' + me.id + '</strong></span>' +
+          '<div class="identity-dept">' + me.deptName + '</div>' +
+        '</div>' +
+        '<button id="btn-switch-user" class="chip-btn hero-id-btn" title="Switch user (admin password required)">Switch</button>' +
+      '</div>';
+
+    document.getElementById("btn-switch-user")?.addEventListener("click", () => {
+      const pwd = prompt("Admin password to switch user:");
+      if (pwd === null) return;
+      if (pwd !== ADMIN_PASSWORD) { alert("Wrong password."); return; }
+      if (!confirm("Switch user? Your holidays stay saved in this browser.")) return;
+      state.me = null;
+      saveState();
+      renderAll();
+    });
+  }
 }
 
 /* ============================================================
