@@ -47,6 +47,87 @@ const URL_PARAMS = new URLSearchParams(location.search);
 const ADMIN_MODE = URL_PARAMS.get("admin") === "1";
 const STORAGE_KEY = "lightship-holiday-planner-v3";
 
+/* ============================================================
+   REMOTE BACKEND (JSONBin.io) — shared selections for everyone
+   ============================================================ */
+const BIN_ID = "69faf63daaba882197790bd2";
+const MASTER_KEY = "$2a$10$txdqQgqRVzUpf12srsah2OTqg0BQcIkEr9eLydRN1lWXk4Bw2SCtu";
+const BIN_URL = "https://api.jsonbin.io/v3/b/" + BIN_ID;
+const POLL_INTERVAL_MS = 10000;     // pull every 10s
+const PUSH_DEBOUNCE_MS = 800;       // debounce writes by 800ms
+
+let lastRemoteUpdatedAt = "";
+let pushTimer = null;
+
+async function pullFromBin() {
+  try {
+    const resp = await fetch(BIN_URL + "/latest", {
+      headers: { "X-Master-Key": MASTER_KEY, "X-Bin-Meta": "false" }
+    });
+    if (!resp.ok) { setStatus("offline (read " + resp.status + ")"); return; }
+    const data = await resp.json();
+    const record = data.record || data;
+    if (!record || !record.selections) return;
+    if (record.updatedAt && record.updatedAt === lastRemoteUpdatedAt) return; // unchanged
+    lastRemoteUpdatedAt = record.updatedAt || new Date().toISOString();
+    // Merge remote into state, but never overwrite OUR row mid-edit
+    for (const [empId, dates] of Object.entries(record.selections)) {
+      if (!EMP_BY_ID[empId]) continue;
+      if (empId === state.me && pushTimer) continue; // local pending edit
+      state.selections[empId] = new Set(dates);
+    }
+    renderActiveMonth();
+    renderSummary();
+    renderFilterList();
+    setStatus("synced " + new Date().toLocaleTimeString());
+  } catch (e) {
+    setStatus("offline (network)");
+  }
+}
+
+async function pushToBin() {
+  try {
+    // Read latest first, then overwrite ONLY our row
+    const r = await fetch(BIN_URL + "/latest", {
+      headers: { "X-Master-Key": MASTER_KEY, "X-Bin-Meta": "false" }
+    });
+    let merged = {};
+    if (r.ok) {
+      const data = await r.json();
+      const record = data.record || data;
+      merged = (record && record.selections) || {};
+    }
+    if (state.me) {
+      merged[state.me] = Array.from(state.selections[state.me] || new Set()).sort();
+    } else {
+      // even without identity, push everything we know
+      for (const [k, v] of Object.entries(state.selections)) merged[k] = Array.from(v).sort();
+    }
+    const payload = { selections: merged, updatedAt: new Date().toISOString() };
+    const resp = await fetch(BIN_URL, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json", "X-Master-Key": MASTER_KEY },
+      body: JSON.stringify(payload)
+    });
+    if (resp.ok) {
+      lastRemoteUpdatedAt = payload.updatedAt;
+      setStatus("saved " + new Date().toLocaleTimeString());
+    } else {
+      setStatus("save failed (" + resp.status + ")");
+    }
+  } catch (e) {
+    setStatus("save failed (network)");
+  }
+}
+
+function schedulePush() {
+  if (pushTimer) clearTimeout(pushTimer);
+  pushTimer = setTimeout(() => {
+    pushTimer = null;
+    pushToBin();
+  }, PUSH_DEBOUNCE_MS);
+}
+
 const state = {
   me: null,
   activeMonth: MONTHS[0],
@@ -109,18 +190,16 @@ function serializeSelections() {
   return out;
 }
 function saveState() {
-  const payload = {
+  // Local persistence — only personal preferences (identity, month, filter)
+  const local = {
     me: state.me, activeMonth: state.activeMonth,
-    selections: serializeSelections(),
     visible: Array.from(state.visible),
-    savedAt: new Date().toISOString()
   };
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
-    setStatus("saved at " + new Date().toLocaleTimeString());
-  } catch (e) {
-    setStatus("could not save (storage full?)");
-  }
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(local));
+  } catch (e) { /* ignore */ }
+  // Holidays are pushed to the shared backend (debounced)
+  schedulePush();
 }
 
 /* ============================================================
@@ -522,6 +601,10 @@ function shareMyLink() {
 function init() {
   loadState();
   renderAll();
+
+  // Initial pull from backend, then poll every POLL_INTERVAL_MS
+  pullFromBin();
+  setInterval(pullFromBin, POLL_INTERVAL_MS);
 
   document.getElementById("btn-export")?.addEventListener("click", exportMine);
   document.getElementById("btn-export-all")?.addEventListener("click", exportAll);
