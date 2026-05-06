@@ -1226,80 +1226,52 @@ body.no-identity .footer { display: none; }
 
 /* ---------- Identity-first welcome state ---------- */
 
-/* Smooth layout transitions via View Transitions API + CSS fallback */
-.hero-brand    { view-transition-name: hero-brand; }
-.hero-identity { view-transition-name: hero-id; }
-.identity-bar  { view-transition-name: identity-bar; }
-
-/* When NO identity is selected: brand is centered horizontally, but its INTERNAL layout
-   (row: mark left, text right) is identical to the logged-in state. This way the
-   View Transition captures the same shape in both states and only animates horizontal
-   position — true slide, no zoom. */
-body.no-identity .hero {
-  padding: 64px 0 0;
-}
-body.no-identity .hero-inner {
-  justify-content: center;
-  padding-bottom: 24px;
+/* ---------- Brand horizontal slide (plain CSS, no view transitions) ---------- */
+.hero-brand {
+  /* JS sets --brand-shift to the px offset that visually centers the brand */
+  transform: translateX(0);
+  transition: transform 0.85s cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: transform;
 }
 body.no-identity .hero-brand {
-  flex: 0 1 auto;
+  transform: translateX(var(--brand-shift, 0));
 }
 
-/* Picker: centered, generous spacing */
-body.no-identity .identity-bar {
-  background: transparent;
-  border-top: none;
-  border-bottom: none;
-  padding: 24px 0 80px;
+/* Identity card slides in from the right when login happens */
+.hero-identity {
+  opacity: 1;
+  transform: translateX(0);
+  transition: opacity 0.6s ease 0.25s, transform 0.6s cubic-bezier(0.22, 1, 0.36, 1) 0.25s;
 }
-body.no-identity .pick-identity {
-  max-width: 760px;
-  margin: 0 auto;
-  text-align: center;
-  align-items: center;
-}
-body.no-identity .pick-prompt {
-  text-align: center;
-  font-size: 24px;
-  margin-bottom: 18px;
-}
-body.no-identity .pick-prompt::before {
-  display: inline;
-}
-body.no-identity .pick-row {
-  justify-content: center;
-}
-body.no-identity .pick-dept-label {
-  text-align: right;
+body.no-identity .hero-identity {
+  opacity: 0;
+  transform: translateX(20px);
+  pointer-events: none;
 }
 
-/* Smooth, longer view transitions — silky slide rather than fade-zoom.
-   Uses a deep ease-out so the element decelerates into its final position. */
-::view-transition-group(*) {
-  animation-duration: 0.85s;
-  animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+/* App sections fade in after login */
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
-::view-transition-old(root),
-::view-transition-new(root) {
-  animation-duration: 0.6s;
-  animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+body:not(.no-identity) .month-meta,
+body:not(.no-identity) .main-grid,
+body:not(.no-identity) .footer {
+  animation: fade-up 0.5s cubic-bezier(0.22, 1, 0.36, 1) 0.4s both;
 }
-::view-transition-old(hero-brand),
-::view-transition-new(hero-brand),
-::view-transition-old(hero-id),
-::view-transition-new(hero-id),
-::view-transition-old(identity-bar),
-::view-transition-new(identity-bar) {
-  animation-duration: 0.85s;
-  animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+
+/* Picker fades out when login happens */
+.identity-bar {
+  transition: opacity 0.4s ease;
 }
-/* Keep the brand fully opaque the whole time — only its position interpolates,
-   so it really looks like it slides from center to left (no fade-through). */
-::view-transition-old(hero-brand) { opacity: 1; }
-::view-transition-new(hero-brand) { opacity: 1; }
+body:not(.no-identity) .identity-bar {
+  opacity: 0;
+  pointer-events: none;
+}
+
 @media (prefers-reduced-motion: reduce) {
-  ::view-transition-group(*),
-  ::view-transition-old(*),
-  ::view-transition-new(*) { animation-duration: 0.001s !important; }
+  .hero-brand, .hero-identity, .identity-bar { transition: none; }
+  body:not(.no-identity) .month-meta,
+  body:not(.no-identity) .main-grid,
+  body:not(.no-identity) .footer { animation: none; }
 }

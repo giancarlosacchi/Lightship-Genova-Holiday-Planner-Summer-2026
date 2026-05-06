@@ -305,16 +305,11 @@ function renderIdentityBar() {
         chip.className = "emp-chip";
         chip.innerHTML = '<span class="swatch" style="background:' + emp.color + '"></span>' + emp.id;
         chip.addEventListener("click", () => {
-          const apply = () => {
-            state.me = emp.id;
-            state.visible.add(emp.id);
-            saveState();
-            renderAll();
-            showToast("Welcome, " + emp.id);
-          };
-          if (document.startViewTransition) {
-            document.startViewTransition(apply);
-          } else { apply(); }
+          state.me = emp.id;
+          state.visible.add(emp.id);
+          saveState();
+          renderAll();
+          showToast("Welcome, " + emp.id);
         });
         row.appendChild(chip);
       }
@@ -346,10 +341,7 @@ function renderIdentityBar() {
       if (pwd === null) return;
       if (pwd !== ADMIN_PASSWORD) { alert("Wrong password."); return; }
       if (!confirm("Switch user? Your holidays stay saved in this browser.")) return;
-      const apply = () => { state.me = null; saveState(); renderAll(); };
-      if (document.startViewTransition) {
-        document.startViewTransition(apply);
-      } else { apply(); }
+      state.me = null; saveState(); renderAll();
     });
   }
 }
@@ -684,6 +676,23 @@ function renderMiniMonths() {
   }
 }
 
+function updateBrandShift() {
+  const inner = document.querySelector(".hero-inner");
+  const brand = document.querySelector(".hero-brand");
+  if (!inner || !brand) return;
+  // Temporarily clear any transform to measure natural left position
+  const prev = brand.style.transform;
+  brand.style.transform = "none";
+  const innerRect = inner.getBoundingClientRect();
+  const brandRect = brand.getBoundingClientRect();
+  const shift = Math.max(0, (innerRect.right - brandRect.right) - (brandRect.left - innerRect.left)) / 2 + (innerRect.width - brandRect.width) / 2;
+  // Simpler & correct: shift = (innerRect.width - brandRect.width) / 2 - (brandRect.left - innerRect.left)
+  const correctShift = (innerRect.width - brandRect.width) / 2 - (brandRect.left - innerRect.left);
+  brand.style.transform = prev;
+  document.documentElement.style.setProperty("--brand-shift", Math.round(correctShift) + "px");
+}
+window.addEventListener("resize", updateBrandShift);
+
 function renderAll() {
   renderIdentityBar();
   renderMonthNav();
@@ -694,6 +703,8 @@ function renderAll() {
   renderPendingBar();
   const adm = document.getElementById("admin-badge");
   if (adm) adm.hidden = !ADMIN_MODE;
+  // Defer until layout is settled, so we measure the FINAL position
+  requestAnimationFrame(() => updateBrandShift());
 }
 
 function renderPendingBar() {
