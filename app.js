@@ -63,6 +63,32 @@ let pushTimer = null;          // legacy field, kept for pull compatibility
 let pushInProgress = false;    // a save is currently in flight
 let pushPendingAgain = false;  // user clicked again while a save was in flight
 
+
+// FLIP technique: animate hero-brand smoothly between centered and left positions.
+// First: measure old position. Apply change. Last: measure new. Invert: translateX old→new. Play: animate to 0.
+function transitionBrandPosition(applyChange) {
+  const brand = document.querySelector(".hero-brand");
+  const heroId = document.querySelector(".hero-identity");
+  if (!brand) { applyChange(); return; }
+  const oldRect = brand.getBoundingClientRect();
+  applyChange();
+  const newRect = brand.getBoundingClientRect();
+  const dx = oldRect.left - newRect.left;
+  if (Math.abs(dx) > 1) {
+    brand.animate(
+      [{ transform: \`translateX(\${dx}px)\` }, { transform: 'translateX(0)' }],
+      { duration: 850, easing: 'cubic-bezier(0.22, 1, 0.36, 1)', fill: 'none' }
+    );
+  }
+  // Identity card (top-right) gets a small slide-in from the right — only when it became visible
+  if (heroId && !heroId.hidden) {
+    heroId.animate(
+      [{ opacity: 0, transform: 'translateX(20px)' }, { opacity: 1, transform: 'translateX(0)' }],
+      { duration: 600, easing: 'cubic-bezier(0.22, 1, 0.36, 1)', delay: 200, fill: 'both' }
+    );
+  }
+}
+
 async function pullFromBin() {
   // Don't refresh while a save is in flight — would race with our local state
   if (pushInProgress) return;
@@ -305,11 +331,13 @@ function renderIdentityBar() {
         chip.className = "emp-chip";
         chip.innerHTML = '<span class="swatch" style="background:' + emp.color + '"></span>' + emp.id;
         chip.addEventListener("click", () => {
-          state.me = emp.id;
-          state.visible.add(emp.id);
-          saveState();
-          renderAll();
-          showToast("Welcome, " + emp.id);
+          transitionBrandPosition(() => {
+            state.me = emp.id;
+            state.visible.add(emp.id);
+            saveState();
+            renderAll();
+            showToast("Welcome, " + emp.id);
+          });
         });
         row.appendChild(chip);
       }
@@ -341,7 +369,7 @@ function renderIdentityBar() {
       if (pwd === null) return;
       if (pwd !== ADMIN_PASSWORD) { alert("Wrong password."); return; }
       if (!confirm("Switch user? Your holidays stay saved in this browser.")) return;
-      state.me = null; saveState(); renderAll();
+      transitionBrandPosition(() => { state.me = null; saveState(); renderAll(); });
     });
   }
 }
@@ -676,23 +704,6 @@ function renderMiniMonths() {
   }
 }
 
-function updateBrandShift() {
-  const inner = document.querySelector(".hero-inner");
-  const brand = document.querySelector(".hero-brand");
-  if (!inner || !brand) return;
-  // Temporarily clear any transform to measure natural left position
-  const prev = brand.style.transform;
-  brand.style.transform = "none";
-  const innerRect = inner.getBoundingClientRect();
-  const brandRect = brand.getBoundingClientRect();
-  const shift = Math.max(0, (innerRect.right - brandRect.right) - (brandRect.left - innerRect.left)) / 2 + (innerRect.width - brandRect.width) / 2;
-  // Simpler & correct: shift = (innerRect.width - brandRect.width) / 2 - (brandRect.left - innerRect.left)
-  const correctShift = (innerRect.width - brandRect.width) / 2 - (brandRect.left - innerRect.left);
-  brand.style.transform = prev;
-  document.documentElement.style.setProperty("--brand-shift", Math.round(correctShift) + "px");
-}
-window.addEventListener("resize", updateBrandShift);
-
 function renderAll() {
   renderIdentityBar();
   renderMonthNav();
@@ -703,8 +714,6 @@ function renderAll() {
   renderPendingBar();
   const adm = document.getElementById("admin-badge");
   if (adm) adm.hidden = !ADMIN_MODE;
-  // Defer until layout is settled, so we measure the FINAL position
-  requestAnimationFrame(() => updateBrandShift());
 }
 
 function renderPendingBar() {

@@ -1226,16 +1226,10 @@ body.no-identity .footer { display: none; }
 
 /* ---------- Identity-first welcome state ---------- */
 
-/* ---------- Brand horizontal slide (plain CSS, no view transitions) ---------- */
-.hero-brand {
-  /* JS sets --brand-shift to the px offset that visually centers the brand */
-  transform: translateX(0);
-  transition: transform 0.85s cubic-bezier(0.22, 1, 0.36, 1);
-  will-change: transform;
-}
-body.no-identity .hero-brand {
-  transform: translateX(var(--brand-shift, 0));
-}
+/* ---------- Brand horizontal slide via JS FLIP technique ----------
+   We let CSS handle the initial layout (centered when no-identity, left when logged-in).
+   The smooth transition between those two layouts is handled in app.js using
+   the Web Animations API with First-Last-Invert-Play. */
 
 /* Identity card slides in from the right when login happens */
 .hero-identity {
