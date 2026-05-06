@@ -74,12 +74,14 @@ async function pullFromBin() {
     // Merge remote into state, but never overwrite OUR row mid-edit
     for (const [empId, dates] of Object.entries(record.selections)) {
       if (!EMP_BY_ID[empId]) continue;
-      if (empId === state.me && pushTimer) continue; // local pending edit
+      if (empId === state.me && hasPendingChanges()) continue; // user has unsaved edits
       state.selections[empId] = new Set(dates);
     }
+    if (!hasPendingChanges()) setSavedMine();
     renderActiveMonth();
     renderSummary();
     renderFilterList();
+    renderPendingBar();
     setStatus("synced " + new Date().toLocaleTimeString());
   } catch (e) {
     setStatus("offline (network)");
@@ -112,6 +114,8 @@ async function pushToBin() {
     });
     if (resp.ok) {
       lastRemoteUpdatedAt = payload.updatedAt;
+      setSavedMine();
+      renderPendingBar();
       setStatus("saved " + new Date().toLocaleTimeString());
     } else {
       setStatus("save failed (" + resp.status + ")");
@@ -134,7 +138,26 @@ const state = {
   activeMonth: MONTHS[0],
   selections: {},
   visible: new Set(EMPLOYEES.map(e => e.id)),
+  savedMineDates: [],   // last confirmed dates for "me"
 };
+
+// Helpers for pending-changes flow
+function snapshotMine() {
+  if (!state.me) return [];
+  return Array.from(state.selections[state.me] || new Set()).sort();
+}
+function setSavedMine() { state.savedMineDates = snapshotMine(); }
+function hasPendingChanges() {
+  return JSON.stringify(snapshotMine()) !== JSON.stringify(state.savedMineDates.slice().sort());
+}
+function discardPending() {
+  if (!state.me) return;
+  state.selections[state.me] = new Set(state.savedMineDates);
+  renderActiveMonth();
+  renderSummary();
+  renderPendingBar();
+  showToast("Changes discarded");
+}
 
 /* ============================================================
    Persistence
@@ -199,8 +222,6 @@ function saveState() {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(local));
   } catch (e) { /* ignore */ }
-  // Holidays are pushed to the shared backend (debounced)
-  schedulePush();
 }
 
 /* ============================================================
@@ -547,8 +568,27 @@ function renderAll() {
   renderActiveMonth();
   renderFilterList();
   renderSummary();
+  renderPendingBar();
   const adm = document.getElementById("admin-badge");
   if (adm) adm.hidden = !ADMIN_MODE;
+}
+
+function renderPendingBar() {
+  const bar = document.getElementById("pending-bar");
+  const summary = document.getElementById("pending-summary");
+  if (!bar) return;
+  if (!hasPendingChanges()) { bar.hidden = true; return; }
+  // Count net changes
+  const cur = new Set(snapshotMine());
+  const saved = new Set(state.savedMineDates);
+  let added = 0, removed = 0;
+  for (const d of cur) if (!saved.has(d)) added++;
+  for (const d of saved) if (!cur.has(d)) removed++;
+  const parts = [];
+  if (added)   parts.push(added + " added");
+  if (removed) parts.push(removed + " removed");
+  summary.textContent = "Unsaved changes — " + parts.join(", ");
+  bar.hidden = false;
 }
 
 /* ============================================================
@@ -672,6 +712,17 @@ function init() {
     state.visible = new Set();
     saveState(); renderActiveMonth(); renderFilterList();
   });
+  document.getElementById("btn-confirm")?.addEventListener("click", () => {
+    if (!state.me) { showToast("Pick your initials first"); return; }
+    if (!hasPendingChanges()) return;
+    pushToBin();
+  });
+  document.getElementById("btn-discard")?.addEventListener("click", () => {
+    if (!hasPendingChanges()) return;
+    if (!confirm("Discard unsaved changes?")) return;
+    discardPending();
+  });
+
   document.getElementById("filter-mine").addEventListener("click", () => {
     if (state.me) state.visible = new Set([state.me]);
     else showToast("Choose who you are first");

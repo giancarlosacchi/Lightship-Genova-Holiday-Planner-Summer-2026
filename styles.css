@@ -973,3 +973,62 @@ h1, h2, h3, h4 { margin: 0; font-weight: 600; }
 }
 .filter-dept-head.all-off { opacity: 0.55; }
 .filter-row { display: flex; flex-wrap: wrap; gap: 5px; padding-left: 4px; }
+
+/* ---------- Pending changes bar ---------- */
+.pending-bar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 60;
+  background: rgba(12, 35, 64, 0.96);
+  color: white;
+  border-top: 2px solid var(--gold);
+  padding: 12px 0;
+  box-shadow: 0 -8px 24px rgba(15, 20, 25, 0.18);
+  animation: slide-up .25s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+@keyframes slide-up {
+  from { transform: translateY(100%); }
+  to   { transform: translateY(0); }
+}
+.pending-bar-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  flex-wrap: wrap;
+}
+.pending-summary {
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.92);
+  font-family: var(--font-display);
+  font-style: italic;
+  letter-spacing: -0.005em;
+}
+.pending-summary::before {
+  content: "—";
+  color: var(--gold);
+  margin-right: 8px;
+  font-style: normal;
+  font-weight: 400;
+}
+.pending-actions { display: flex; gap: 8px; }
+.pending-bar .btn-link {
+  background: transparent;
+  color: rgba(255, 255, 255, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.30);
+  padding: 7px 14px;
+  font-size: 13px;
+  border-radius: var(--r-md);
+}
+.pending-bar .btn-link:hover { background: rgba(255, 255, 255, 0.10); border-color: rgba(255, 255, 255, 0.55); color: white; }
+.pending-bar .btn-primary {
+  background: var(--gold);
+  color: var(--navy);
+  border-color: var(--gold);
+}
+.pending-bar .btn-primary:hover { background: #d9a04a; border-color: #d9a04a; }
+
+/* Add bottom padding so footer/grid don't hide behind the bar when visible */
+body.has-pending { padding-bottom: 72px; }
