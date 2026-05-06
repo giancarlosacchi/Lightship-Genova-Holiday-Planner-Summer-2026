@@ -102,6 +102,8 @@ async function pushToBin() {
   if (pushInProgress) { pushPendingAgain = true; return; }
   pushInProgress = true;
   setStatus("saving…");
+  // Capture EXACTLY what we are about to push (so post-success we know what was synced)
+  let pushedMine = null;
   try {
     // Read-merge-write: read latest then overwrite only our row (other rows preserved)
     const r = await fetch(BIN_URL + "/latest", {
@@ -114,7 +116,8 @@ async function pushToBin() {
       merged = (record && record.selections) || {};
     }
     if (state.me) {
-      merged[state.me] = Array.from(state.selections[state.me] || new Set()).sort();
+      pushedMine = Array.from(state.selections[state.me] || new Set()).sort();
+      merged[state.me] = pushedMine;
     } else {
       for (const [k, v] of Object.entries(state.selections)) merged[k] = Array.from(v).sort();
     }
@@ -126,7 +129,8 @@ async function pushToBin() {
     });
     if (resp.ok) {
       lastRemoteUpdatedAt = payload.updatedAt;
-      setSavedMine();
+      // savedMineDates = exactly what was just synced (NOT current state, which may have moved on)
+      if (pushedMine !== null) state.savedMineDates = pushedMine;
       try { localStorage.setItem(BACKUP_KEY, JSON.stringify(serializeSelections())); } catch(e){}
       setStatus("saved " + new Date().toLocaleTimeString());
     } else {
@@ -136,7 +140,7 @@ async function pushToBin() {
     setStatus("save failed (network)");
   } finally {
     pushInProgress = false;
-    // If user clicked while we were saving, save again
+    // If user clicked while we were saving, save again — local state may differ from what was pushed
     if (pushPendingAgain) {
       pushPendingAgain = false;
       pushToBin();
