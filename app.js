@@ -141,17 +141,32 @@ async function pushToBin() {
     const r = await fetch(BIN_URL + "/latest", {
       headers: { "X-Master-Key": MASTER_KEY, "X-Bin-Meta": "false" }
     });
-    let merged = {};
-    if (r.ok) {
-      const data = await r.json();
-      const record = data.record || data;
-      merged = (record && record.selections) || {};
+    // CRITICAL: if the read fails, ABORT the save. Otherwise we'd write back
+    // an empty/partial payload and wipe everyone else's holidays.
+    if (!r.ok) {
+      setStatus("save aborted (read " + r.status + ") — will retry");
+      return;
     }
+    const data = await r.json();
+    const record = data.record || data;
+    const merged = (record && record.selections) || {};
     if (state.me) {
       pushedMine = Array.from(state.selections[state.me] || new Set()).sort();
       merged[state.me] = pushedMine;
     } else {
-      for (const [k, v] of Object.entries(state.selections)) merged[k] = Array.from(v).sort();
+      // No identity picked yet — do NOT overwrite anyone. This should never
+      // trigger a real change, but bail out just in case.
+      setStatus("save aborted (no identity)");
+      return;
+    }
+    // Safety: never PUT a payload that shrinks total rows compared to remote.
+    // If we somehow ended up with fewer known people than the server had,
+    // treat that as a bug and abort instead of nuking data.
+    const remoteCount = Object.keys((record && record.selections) || {}).length;
+    const mergedCount = Object.keys(merged).length;
+    if (remoteCount > 0 && mergedCount < remoteCount) {
+      setStatus("save aborted (safety guard)");
+      return;
     }
     const payload = { selections: merged, updatedAt: new Date().toISOString() };
     const resp = await fetch(BIN_URL, {
