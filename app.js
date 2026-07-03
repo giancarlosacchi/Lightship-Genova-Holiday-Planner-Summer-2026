@@ -49,22 +49,31 @@ const STORAGE_KEY = "lightship-holiday-planner-v3";
 const ADMIN_PASSWORD = "lightship2026"; // change this if needed
 
 /* ============================================================
-   REMOTE BACKEND (JSONBin.io) — shared selections for everyone
+   REMOTE BACKEND (Firebase Realtime Database) — shared selections for everyone.
+   Firebase provides atomic per-child writes: setting selections/GCS ONLY writes
+   that node without touching anyone else's. No read-merge-write race, no wipe
+   possible from a client bug. Free tier: 10GB/month bandwidth — plenty for us.
    ============================================================ */
-const BIN_ID = "69faf63daaba882197790bd2";
-const MASTER_KEY = "$2a$10$txdqQgqRVzUpf12srsah2OTqg0BQcIkEr9eLydRN1lWXk4Bw2SCtu";
-const BIN_URL = "https://api.jsonbin.io/v3/b/" + BIN_ID;
-const POLL_INTERVAL_MS = 30000;     // pull every 30s (only when tab visible)
-const PUSH_DEBOUNCE_MS = 250;       // near-instant write
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyDqKWZ_fYtIIXdasEHX5atCwJ995rjFMZg",
+  authDomain: "lightship-holiday-planner.firebaseapp.com",
+  databaseURL: "https://lightship-holiday-planner-default-rtdb.firebaseio.com",
+  projectId: "lightship-holiday-planner",
+  storageBucket: "lightship-holiday-planner.firebasestorage.app",
+  messagingSenderId: "545676531164",
+  appId: "1:545676531164:web:fcd376a877d56a89912b19"
+};
 const BACKUP_KEY = "lightship-holiday-planner-v3-data";
-const SNAPSHOTS_KEY = "lightship-holiday-planner-v3-snapshots";  // ring buffer of last non-empty states — NEVER wiped by pulls
-const SNAPSHOT_KEEP = 30;   // keep last 30 snapshots
-const SNAPSHOT_MIN_GAP_MS = 5 * 60 * 1000;  // don't snapshot more than once per 5 minutes
+const SNAPSHOTS_KEY = "lightship-holiday-planner-v3-snapshots";  // ring buffer — NEVER wiped by pulls
+const SNAPSHOT_KEEP = 30;
+const SNAPSHOT_MIN_GAP_MS = 5 * 60 * 1000;
+const POLL_INTERVAL_MS = 60000;  // safety fallback poll (real-time listener does the real work)
 
-let lastRemoteUpdatedAt = "";
-let pushTimer = null;          // legacy field, kept for pull compatibility
-let pushInProgress = false;    // a save is currently in flight
-let pushPendingAgain = false;  // user clicked again while a save was in flight
+let pushInProgress = false;
+let pushPendingAgain = false;
+let firebaseDb = null;      // firebase.database() reference
+let firebaseReady = false;  // set to true when the initial value snapshot has arrived
+let firebaseFailed = false; // set to true if SDK failed to load or init
 
 
 // FLIP technique: animate hero-brand smoothly between centered and left positions.
@@ -97,58 +106,88 @@ function transitionBrandPosition(applyChange) {
   }
 }
 
-async function pullFromBin() {
-  // Don't refresh while a save is in flight — would race with our local state
-  if (pushInProgress) return;
+function initFirebase() {
+  if (firebaseDb) return firebaseDb;
   try {
-    const resp = await fetch(BIN_URL + "/latest", {
-      headers: { "X-Master-Key": MASTER_KEY, "X-Bin-Meta": "false" }
+    if (typeof firebase === "undefined") {
+      firebaseFailed = true;
+      setStatus("Firebase SDK missing — offline");
+      return null;
+    }
+    firebase.initializeApp(FIREBASE_CONFIG);
+    firebaseDb = firebase.database();
+    // Real-time listener on the whole selections tree — pushed to us instantly on any change.
+    firebaseDb.ref("selections").on("value", (snapshot) => {
+      applyRemoteSelections(snapshot.val() || {}, "listener");
+    }, (err) => {
+      console.error("[HP] Firebase listener error:", err);
+      setStatus("offline (listener err)");
     });
-    if (!resp.ok) {
-      // Rate-limited (403) or other read error — keep local data intact
-      setStatus("offline (read " + resp.status + ") — using local");
-      return;
-    }
-    const data = await resp.json();
-    const record = data.record || data;
-    if (!record || !record.selections) return;
-    if (record.updatedAt && record.updatedAt === lastRemoteUpdatedAt) return; // unchanged
-
-    // CRITICAL: If server returned an EMPTY payload but we have non-empty local data
-    // OR we have a non-empty snapshot on record, refuse to trust the server.
-    // This protects against a wipe on the server clobbering our local truth.
-    const remoteDays = countDays(record.selections);
-    const localDays = countDays(serializeSelections());
-    const lastSnap = lastGoodSnapshot();
-    const snapshotDays = lastSnap ? countDays(lastSnap.selections) : 0;
-    if (remoteDays === 0 && (localDays > 0 || snapshotDays > 0)) {
-      setStatus("server returned empty — keeping local (guarded)");
-      console.warn("[HP] Refused empty server payload. local=" + localDays + " snap=" + snapshotDays);
-      return;
-    }
-
-    lastRemoteUpdatedAt = record.updatedAt || new Date().toISOString();
-    // Merge remote into state. Never overwrite OUR row if we have unsaved local edits.
-    let mergedMine = false;
-    for (const [empId, dates] of Object.entries(record.selections)) {
-      if (!EMP_BY_ID[empId]) continue;
-      if (empId === state.me && hasPendingChanges()) continue;
-      state.selections[empId] = new Set(dates);
-      if (empId === state.me) mergedMine = true;
-    }
-    if (mergedMine || !state.me) setSavedMine();
-    // Persist a fresh local backup so reloads survive offline
-    try { localStorage.setItem(BACKUP_KEY, JSON.stringify(serializeSelections())); } catch(e){}
-    // Persistent snapshot ring (only non-empty states)
-    pushSnapshot(serializeSelections(), "pull");
-    renderActiveMonth();
-    renderMiniMonths();
-    renderSummary();
-    renderFilterList();
-    renderPendingBar();
-    setStatus("synced " + new Date().toLocaleTimeString());
+    return firebaseDb;
   } catch (e) {
-    setStatus("offline (network) — using local");
+    console.error("[HP] Firebase init failed:", e);
+    firebaseFailed = true;
+    setStatus("offline (init err) — using local");
+    return null;
+  }
+}
+
+// Apply remote selections into local state, with wipe protection guards.
+function applyRemoteSelections(remoteSel, source) {
+  if (!remoteSel || typeof remoteSel !== "object") remoteSel = {};
+
+  // CRITICAL GUARD: if the server returned an EMPTY tree but we have non-empty
+  // local data or a non-empty snapshot on file, IGNORE the empty payload.
+  const remoteDays = countDays(remoteSel);
+  const localDays = countDays(serializeSelections());
+  const lastSnap = lastGoodSnapshot();
+  const snapshotDays = lastSnap ? countDays(lastSnap.selections) : 0;
+  if (remoteDays === 0 && (localDays > 0 || snapshotDays > 0)) {
+    setStatus("server returned empty — keeping local (guarded)");
+    console.warn("[HP] Refused empty server payload. local=" + localDays + " snap=" + snapshotDays + " source=" + source);
+    return;
+  }
+
+  // Merge remote into state. Never overwrite OUR row if we have unsaved local edits.
+  let mergedMine = false;
+  for (const [empId, dates] of Object.entries(remoteSel)) {
+    if (!EMP_BY_ID[empId]) continue;
+    if (empId === state.me && hasPendingChanges()) continue;
+    state.selections[empId] = new Set(Array.isArray(dates) ? dates : []);
+    if (empId === state.me) mergedMine = true;
+  }
+  // Also drop any local employees whose entries no longer exist remotely — but ONLY
+  // when the remote had at least one entry (so a temporary blip doesn't clear us).
+  if (remoteDays > 0) {
+    for (const empId of Object.keys(state.selections)) {
+      if (!(empId in remoteSel) && empId !== state.me) {
+        // keep the local value — safer than deleting.
+      }
+    }
+  }
+  if (mergedMine || !state.me) setSavedMine();
+  // Persist a fresh local backup so reloads survive offline
+  try { localStorage.setItem(BACKUP_KEY, JSON.stringify(serializeSelections())); } catch(e){}
+  // Persistent snapshot ring (only non-empty states)
+  pushSnapshot(serializeSelections(), source);
+  firebaseReady = true;
+  renderActiveMonth();
+  renderMiniMonths();
+  renderSummary();
+  renderFilterList();
+  renderPendingBar();
+  setStatus("synced " + new Date().toLocaleTimeString());
+}
+
+// Legacy name — used by init and visibility handler as a manual "pull now" trigger.
+async function pullFromBin() {
+  if (!firebaseDb) initFirebase();
+  if (!firebaseDb) return;
+  try {
+    const snap = await firebaseDb.ref("selections").once("value");
+    applyRemoteSelections(snap.val() || {}, "pull");
+  } catch (e) {
+    setStatus("offline (pull err) — using local");
   }
 }
 
@@ -157,62 +196,29 @@ async function pushToBin() {
   if (pushInProgress) { pushPendingAgain = true; return; }
   pushInProgress = true;
   setStatus("saving…");
-  // Capture EXACTLY what we are about to push (so post-success we know what was synced)
-  let pushedMine = null;
   try {
-    // Read-merge-write: read latest then overwrite only our row (other rows preserved)
-    const r = await fetch(BIN_URL + "/latest", {
-      headers: { "X-Master-Key": MASTER_KEY, "X-Bin-Meta": "false" }
-    });
-    // CRITICAL: if the read fails, ABORT the save. Otherwise we'd write back
-    // an empty/partial payload and wipe everyone else's holidays.
-    if (!r.ok) {
-      setStatus("save aborted (read " + r.status + ") — will retry");
+    if (!state.me) {
+      // No identity picked yet — save prefs only, do NOT touch remote.
+      setStatus("save skipped (no identity)");
       return;
     }
-    const data = await r.json();
-    const record = data.record || data;
-    const merged = (record && record.selections) || {};
-    if (state.me) {
-      pushedMine = Array.from(state.selections[state.me] || new Set()).sort();
-      merged[state.me] = pushedMine;
-    } else {
-      // No identity picked yet — do NOT overwrite anyone. This should never
-      // trigger a real change, but bail out just in case.
-      setStatus("save aborted (no identity)");
+    if (!firebaseDb) initFirebase();
+    if (!firebaseDb) {
+      setStatus("offline — will retry");
       return;
     }
-    // Safety: never PUT a payload that shrinks total rows compared to remote.
-    // If we somehow ended up with fewer known people than the server had,
-    // treat that as a bug and abort instead of nuking data.
-    const remoteCount = Object.keys((record && record.selections) || {}).length;
-    const mergedCount = Object.keys(merged).length;
-    if (remoteCount > 0 && mergedCount < remoteCount) {
-      setStatus("save aborted (safety guard)");
-      return;
-    }
-    const payload = { selections: merged, updatedAt: new Date().toISOString() };
-    const resp = await fetch(BIN_URL, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json", "X-Master-Key": MASTER_KEY },
-      body: JSON.stringify(payload)
-    });
-    if (resp.ok) {
-      lastRemoteUpdatedAt = payload.updatedAt;
-      // savedMineDates = exactly what was just synced (NOT current state, which may have moved on)
-      if (pushedMine !== null) state.savedMineDates = pushedMine;
-      try { localStorage.setItem(BACKUP_KEY, JSON.stringify(serializeSelections())); } catch(e){}
-      // Persistent snapshot ring — always after a successful push with real data
-      pushSnapshot(serializeSelections(), "push");
-      setStatus("saved " + new Date().toLocaleTimeString());
-    } else {
-      setStatus("save failed (" + resp.status + ")");
-    }
+    const mine = Array.from(state.selections[state.me] || new Set()).sort();
+    // Firebase atomic set on OUR node only — cannot possibly affect other employees' rows.
+    await firebaseDb.ref("selections/" + state.me).set(mine);
+    state.savedMineDates = mine;
+    try { localStorage.setItem(BACKUP_KEY, JSON.stringify(serializeSelections())); } catch(e){}
+    pushSnapshot(serializeSelections(), "push");
+    setStatus("saved " + new Date().toLocaleTimeString());
   } catch (e) {
-    setStatus("save failed (network)");
+    console.error("[HP] push error:", e);
+    setStatus("save failed (" + (e && e.code ? e.code : "network") + ")");
   } finally {
     pushInProgress = false;
-    // If user clicked while we were saving, save again — local state may differ from what was pushed
     if (pushPendingAgain) {
       pushPendingAgain = false;
       pushToBin();
@@ -919,16 +925,16 @@ function init() {
   setSavedMine();
   renderAll();
 
-  // Initial pull from backend, then poll every POLL_INTERVAL_MS — only when tab is visible.
-  // This drastically cuts JSONBin API load and prevents quota exhaustion.
-  pullFromBin();
+  // Start Firebase — this attaches a real-time listener that will keep everyone
+  // in sync automatically. No polling needed for correctness; the interval below
+  // is just a safety net in case the socket drops.
+  initFirebase();
   setInterval(() => {
-    if (document.hidden) return;   // skip when tab is in background
-    pullFromBin();
+    if (document.hidden) return;
+    if (!firebaseDb || !firebaseReady) pullFromBin();
   }, POLL_INTERVAL_MS);
-  // Also pull immediately when the tab comes back into focus
   document.addEventListener("visibilitychange", () => {
-    if (!document.hidden) pullFromBin();
+    if (!document.hidden && (!firebaseDb || !firebaseReady)) pullFromBin();
   });
 
   document.getElementById("btn-export")?.addEventListener("click", exportMine);
