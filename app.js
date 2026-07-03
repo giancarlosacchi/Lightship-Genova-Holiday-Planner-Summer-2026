@@ -54,9 +54,12 @@ const ADMIN_PASSWORD = "lightship2026"; // change this if needed
 const BIN_ID = "69faf63daaba882197790bd2";
 const MASTER_KEY = "$2a$10$txdqQgqRVzUpf12srsah2OTqg0BQcIkEr9eLydRN1lWXk4Bw2SCtu";
 const BIN_URL = "https://api.jsonbin.io/v3/b/" + BIN_ID;
-const POLL_INTERVAL_MS = 10000;     // pull every 10s
+const POLL_INTERVAL_MS = 30000;     // pull every 30s (only when tab visible)
 const PUSH_DEBOUNCE_MS = 250;       // near-instant write
 const BACKUP_KEY = "lightship-holiday-planner-v3-data";
+const SNAPSHOTS_KEY = "lightship-holiday-planner-v3-snapshots";  // ring buffer of last non-empty states — NEVER wiped by pulls
+const SNAPSHOT_KEEP = 30;   // keep last 30 snapshots
+const SNAPSHOT_MIN_GAP_MS = 5 * 60 * 1000;  // don't snapshot more than once per 5 minutes
 
 let lastRemoteUpdatedAt = "";
 let pushTimer = null;          // legacy field, kept for pull compatibility
@@ -101,11 +104,29 @@ async function pullFromBin() {
     const resp = await fetch(BIN_URL + "/latest", {
       headers: { "X-Master-Key": MASTER_KEY, "X-Bin-Meta": "false" }
     });
-    if (!resp.ok) { setStatus("offline (read " + resp.status + ")"); return; }
+    if (!resp.ok) {
+      // Rate-limited (403) or other read error — keep local data intact
+      setStatus("offline (read " + resp.status + ") — using local");
+      return;
+    }
     const data = await resp.json();
     const record = data.record || data;
     if (!record || !record.selections) return;
     if (record.updatedAt && record.updatedAt === lastRemoteUpdatedAt) return; // unchanged
+
+    // CRITICAL: If server returned an EMPTY payload but we have non-empty local data
+    // OR we have a non-empty snapshot on record, refuse to trust the server.
+    // This protects against a wipe on the server clobbering our local truth.
+    const remoteDays = countDays(record.selections);
+    const localDays = countDays(serializeSelections());
+    const lastSnap = lastGoodSnapshot();
+    const snapshotDays = lastSnap ? countDays(lastSnap.selections) : 0;
+    if (remoteDays === 0 && (localDays > 0 || snapshotDays > 0)) {
+      setStatus("server returned empty — keeping local (guarded)");
+      console.warn("[HP] Refused empty server payload. local=" + localDays + " snap=" + snapshotDays);
+      return;
+    }
+
     lastRemoteUpdatedAt = record.updatedAt || new Date().toISOString();
     // Merge remote into state. Never overwrite OUR row if we have unsaved local edits.
     let mergedMine = false;
@@ -118,6 +139,8 @@ async function pullFromBin() {
     if (mergedMine || !state.me) setSavedMine();
     // Persist a fresh local backup so reloads survive offline
     try { localStorage.setItem(BACKUP_KEY, JSON.stringify(serializeSelections())); } catch(e){}
+    // Persistent snapshot ring (only non-empty states)
+    pushSnapshot(serializeSelections(), "pull");
     renderActiveMonth();
     renderMiniMonths();
     renderSummary();
@@ -125,7 +148,7 @@ async function pullFromBin() {
     renderPendingBar();
     setStatus("synced " + new Date().toLocaleTimeString());
   } catch (e) {
-    setStatus("offline (network)");
+    setStatus("offline (network) — using local");
   }
 }
 
@@ -179,6 +202,8 @@ async function pushToBin() {
       // savedMineDates = exactly what was just synced (NOT current state, which may have moved on)
       if (pushedMine !== null) state.savedMineDates = pushedMine;
       try { localStorage.setItem(BACKUP_KEY, JSON.stringify(serializeSelections())); } catch(e){}
+      // Persistent snapshot ring — always after a successful push with real data
+      pushSnapshot(serializeSelections(), "push");
       setStatus("saved " + new Date().toLocaleTimeString());
     } else {
       setStatus("save failed (" + resp.status + ")");
@@ -197,6 +222,62 @@ async function pushToBin() {
 
 // Save now — no debounce
 function schedulePush() { pushToBin(); }
+
+/* ============================================================
+   Snapshot ring — persistent, tamper-resistant local backup.
+   These snapshots survive wipes, pulls, and 403s. Never cleared
+   automatically. Used as last-resort recovery source.
+   ============================================================ */
+function getSnapshots() {
+  try {
+    const raw = localStorage.getItem(SNAPSHOTS_KEY);
+    if (!raw) return [];
+    const arr = JSON.parse(raw);
+    return Array.isArray(arr) ? arr : [];
+  } catch (e) { return []; }
+}
+function countDays(selections) {
+  let n = 0;
+  for (const v of Object.values(selections || {})) {
+    n += Array.isArray(v) ? v.length : (v && v.size) || 0;
+  }
+  return n;
+}
+function pushSnapshot(selections, reason) {
+  // Only snapshot NON-EMPTY states. An empty snapshot is worthless.
+  if (!selections || countDays(selections) === 0) return;
+  const snaps = getSnapshots();
+  const now = Date.now();
+  // Rate-limit: skip if we already snapped in the last SNAPSHOT_MIN_GAP_MS
+  if (snaps.length && (now - snaps[0].ts) < SNAPSHOT_MIN_GAP_MS) return;
+  // Skip if identical to the most recent one
+  const serialized = JSON.stringify(selections);
+  if (snaps.length && JSON.stringify(snaps[0].selections) === serialized) return;
+  snaps.unshift({ ts: now, iso: new Date(now).toISOString(), reason: reason || "auto", selections });
+  const trimmed = snaps.slice(0, SNAPSHOT_KEEP);
+  try { localStorage.setItem(SNAPSHOTS_KEY, JSON.stringify(trimmed)); } catch(e){}
+}
+function lastGoodSnapshot() {
+  const snaps = getSnapshots();
+  for (const snap of snaps) if (countDays(snap.selections) > 0) return snap;
+  return null;
+}
+// Expose to console for emergency recovery
+window.lhp = window.lhp || {};
+window.lhp.snapshots = getSnapshots;
+window.lhp.lastGood = lastGoodSnapshot;
+window.lhp.exportSnapshot = function(index) {
+  const snap = getSnapshots()[index || 0];
+  if (!snap) { console.log("no snapshot at index", index); return; }
+  const payload = { app:"lightship-holiday-planner", version:3, year:2026, exportedBy:"snapshot-recovery", exportedAt:snap.iso, selections:snap.selections };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = "recovery-" + snap.iso.replace(/[:.]/g,"-") + ".json";
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
+  return "downloaded snapshot from " + snap.iso;
+};
 
 const state = {
   me: null,
@@ -266,6 +347,14 @@ function loadState() {
     if (backup) {
       const sel = JSON.parse(backup);
       applySerializedSelections(sel);
+    }
+    // Fallback: if regular backup is empty (or missing), pull from the snapshot ring
+    if (countDays(serializeSelections()) === 0) {
+      const snap = lastGoodSnapshot();
+      if (snap) {
+        console.warn("[HP] Regular backup empty — restoring from snapshot", snap.iso);
+        applySerializedSelections(snap.selections);
+      }
     }
   } catch (e) { console.warn("Could not load state", e); }
 }
@@ -830,9 +919,17 @@ function init() {
   setSavedMine();
   renderAll();
 
-  // Initial pull from backend, then poll every POLL_INTERVAL_MS
+  // Initial pull from backend, then poll every POLL_INTERVAL_MS — only when tab is visible.
+  // This drastically cuts JSONBin API load and prevents quota exhaustion.
   pullFromBin();
-  setInterval(pullFromBin, POLL_INTERVAL_MS);
+  setInterval(() => {
+    if (document.hidden) return;   // skip when tab is in background
+    pullFromBin();
+  }, POLL_INTERVAL_MS);
+  // Also pull immediately when the tab comes back into focus
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden) pullFromBin();
+  });
 
   document.getElementById("btn-export")?.addEventListener("click", exportMine);
   document.getElementById("btn-export-all")?.addEventListener("click", exportAll);
