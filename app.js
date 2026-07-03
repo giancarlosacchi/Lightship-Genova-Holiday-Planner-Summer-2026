@@ -744,11 +744,11 @@ function renderMiniMonths() {
   const today = todayIso();
 
   for (const m of MONTHS) {
-    if (m === state.activeMonth) continue; // skip the active one — it's the big view above
+    // Show all months, including the active one, so you always see the 3-month strip.
 
     const card = document.createElement("button");
-    card.className = "mini-month";
-    card.title = "Open " + MONTH_NAMES[m];
+    card.className = "mini-month" + (m === state.activeMonth ? " active" : "");
+    card.title = m === state.activeMonth ? MONTH_NAMES[m] + " (currently open)" : "Open " + MONTH_NAMES[m];
     card.addEventListener("click", () => {
       state.activeMonth = m;
       saveState();

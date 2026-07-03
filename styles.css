@@ -1295,3 +1295,13 @@ body:not(.no-identity) .identity-bar {
   body:not(.no-identity) .main-grid,
   body:not(.no-identity) .footer { animation: none; }
 }
+
+
+/* Active mini-month card — subtle highlight matching the big view above */
+.mini-month.active {
+  border-color: var(--navy);
+  background: linear-gradient(180deg, rgba(12, 35, 64, 0.03), var(--surface));
+  box-shadow: 0 0 0 1px var(--navy), var(--sh-2);
+}
+.mini-month.active .mini-month-name { color: var(--navy); }
+.mini-month.active:hover { transform: none; }
