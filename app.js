@@ -4,7 +4,7 @@
    ============================================================ */
 
 const YEAR = 2026;
-const MONTHS = [4, 5, 6, 7, 8];
+const MONTHS = [6, 7, 8];
 
 const MONTH_NAMES = ["January","February","March","April","May","June","July","August","September","October","November","December"];
 const MONTH_SHORT = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];

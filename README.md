@@ -1,6 +1,6 @@
 # Holiday Planner — Lightship Genova
 
-Interactive vacation planner for **May → September 2026**.
+Interactive vacation planner for **July → September 2026**.
 Static HTML/CSS/JS, no build step, no backend. Ready to publish on **GitHub Pages**.
 
 ## How it works
