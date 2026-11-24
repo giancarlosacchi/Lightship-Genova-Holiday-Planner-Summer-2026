@@ -20,13 +20,16 @@ const HOLIDAYS = {
 
 const DEPARTMENTS = [
   { name: "Broker — Gearless", key: "gearless",   members: ["OPE", "MPE", "LDC", "BEE", "MCD"] },
-  { name: "Broker — Geared",   key: "geared",     members: ["SDP", "FGA"] },
+  { name: "Broker — Geared",   key: "geared",     members: ["SDP", "FGA", "IEB"] },
   { name: "Back Office",       key: "backoffice", members: ["MST", "GBE", "CPA", "GCS"] },
   { name: "Sale and Purchase", key: "snp",        members: ["FEG", "ACR"] },
 ];
 const PALETTE = ["#1677c2","#e0313f","#f2a93b","#2f9e6e","#7b5cd6","#0fa3b1","#e56b2f","#c23b8c","#5a8f29","#3d5a98","#d4a017","#8c5a3c","#4aa3df"];
 const EMPLOYEES = [];
-DEPARTMENTS.forEach(d => d.members.forEach(id => EMPLOYEES.push({ id, dept: d.key, deptName: d.name, color: PALETTE[EMPLOYEES.length] })));
+// colours stay put when someone joins: newcomers get their own entry here
+const OWN_COLOR = { IEB: "#b5476b" };
+let nextColor = 0;
+DEPARTMENTS.forEach(d => d.members.forEach(id => EMPLOYEES.push({ id, dept: d.key, deptName: d.name, color: OWN_COLOR[id] || PALETTE[nextColor++] })));
 const EMP = Object.fromEntries(EMPLOYEES.map(e => [e.id, e]));
 
 /* Same database as the summer planner. Dates carry the year, and every

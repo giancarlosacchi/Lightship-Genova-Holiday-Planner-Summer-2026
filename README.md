@@ -20,7 +20,7 @@ Add `?dry=1` to the address to try the page without saving anything.
 | Department          | Members                    |
 |---------------------|----------------------------|
 | Broker — Gearless   | OPE, MPE, LDC, BEE, MCD    |
-| Broker — Geared     | SDP, FGA                   |
+| Broker — Geared     | SDP, FGA, IEB              |
 | Back Office         | MST, GBE, CPA, GCS         |
 | Sale and Purchase   | FEG, ACR                   |
 
