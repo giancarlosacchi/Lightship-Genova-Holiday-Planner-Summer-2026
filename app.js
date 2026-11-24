@@ -106,6 +106,7 @@ function save(id, date, on) {
 
 function setSync(kind) {
   const el = $("#sync");
+  if (!el) return;
   el.className = "sync " + kind;
   el.querySelector("span").textContent = DRY_RUN ? "Preview — not saving" : kind === "ok" ? "Live" : kind === "err" ? "Offline" : "Connecting";
 }
@@ -344,7 +345,8 @@ function renderMe() {
   if (!state.me) { el.hidden = true; return; }
   const e = EMP[state.me];
   el.hidden = false;
-  el.innerHTML = '<span class="me-tag" style="--c:' + e.color + '"><i></i>' + e.id + '</span><button class="me-switch" type="button">Not you?</button>';
+  // your initials; click them to switch person (asks for the password)
+  el.innerHTML = '<button class="me-tag me-switch" type="button" style="--c:' + e.color + '" title="Switch person" aria-label="You are ' + e.id + '. Switch person"><i></i>' + e.id + '</button>';
 }
 
 let whoTimer = null;

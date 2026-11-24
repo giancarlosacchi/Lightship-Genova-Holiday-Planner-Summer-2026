@@ -422,7 +422,7 @@ body.who-open { overflow: hidden; }
 /* ---------- 6 January: the Befana's shadow behind the paper ---------- */
 .befana-shadow { position: absolute; inset: 0; z-index: 2; pointer-events: none; overflow: hidden; mix-blend-mode: multiply; animation: bfIn .8s ease both; }
 .befana-shadow svg {
-  position: absolute; left: -35%; top: 40%;
+  position: absolute; left: 108%; top: 40%;
   width: clamp(170px, 30%, 360px);
   fill: #2a2326; opacity: .2;
   filter: blur(9px);
@@ -432,8 +432,20 @@ body.who-open { overflow: hidden; }
 @keyframes bfIn { from { opacity: 0; } }
 @keyframes bfOut { to { opacity: 0; } }
 @keyframes bfFly {
-  0%   { left: -35%; top: 42%; transform: rotate(-8deg) scale(.9); }
-  30%  { top: 20%; transform: rotate(-2deg) scale(1); }
-  60%  { top: 32%; transform: rotate(4deg) scale(1.05); }
-  100% { left: 108%; top: 12%; transform: rotate(-4deg) scale(.95); }
+  0%   { left: 108%; top: 42%; transform: rotate(8deg) scale(.9); }
+  30%  { top: 20%; transform: rotate(2deg) scale(1); }
+  60%  { top: 32%; transform: rotate(-4deg) scale(1.05); }
+  100% { left: -35%; top: 12%; transform: rotate(4deg) scale(.95); }
+}
+
+/* the top bar carries only the months and your initials */
+.sr-only { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+button.me-tag { border: 0; cursor: pointer; font: inherit; font-weight: 600; font-size: 14px; letter-spacing: .05em; text-decoration: none; min-height: 34px; transition: filter .15s, transform .12s; }
+button.me-tag:hover { filter: brightness(.95); }
+button.me-tag:active { transform: scale(.96); }
+@media (max-width: 760px) {
+  .top { grid-template-columns: 1fr auto; }
+  .brand { display: none; }
+  .months { grid-column: 1; grid-row: 1; justify-self: stretch; }
+  .right { grid-column: 2; grid-row: 1; }
 }
