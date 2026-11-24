@@ -636,7 +636,7 @@ function planeRoll() {
 /* ---------------- easter eggs ---------------- */
 const EGG_DATES = {
   "2026-12-24": "eve", "2026-12-25": "xmas", "2026-12-31": "nye", "2027-01-01": "newyear",
-  "2027-02-09": "carnival", "2027-02-14": "valentine", "2026-12-21": "solstice"
+  "2027-02-09": "carnival", "2027-02-14": "valentine"
 };
 
 // 2. Hover special days.
@@ -655,7 +655,6 @@ function onEggHover(e) {
     newyear:  () => fireworks(x, y, 3),
     carnival: () => confetti(x, r.top, 60),
     valentine:() => hearts(x, y),
-    solstice: () => toast("Shortest day of the year. It only gets brighter from here."),
     today:    () => ping(r)
   })[c.dataset.egg]?.();
 }
