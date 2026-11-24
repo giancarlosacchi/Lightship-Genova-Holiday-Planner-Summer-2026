@@ -774,62 +774,99 @@ function christmasTree(date) {
   };
 }
 
-// 8 December (Gian's birthday): a plate of pizzoccheri fills up — buckwheat
-// ribbons, potato, savoy cabbage, melting cheese, sage — then it steams.
-// Every time the plate is filled a little differently.
+// 8 December (Gian's birthday): a plate of pizzoccheri is served right on the
+// day and fills up — buckwheat ribbons, potato, savoy cabbage, melting cheese,
+// fried sage, a dusting of grana — then it steams. Never filled the same way twice.
 function pizzoccheri(date) {
   const r = cellRect(date);
-  const w = Math.max(110, Math.min(176, r.width * 1.05)), h = w * 80 / 120;
+  const w = Math.max(140, Math.min(230, r.width * 1.15)), h = w * 90 / 140;
   const el = document.createElement("div");
   el.className = "pizz";
-  // served beside the day, leaning into the next square, so the writing on the 8th stays readable
-  const place = q => { el.style.left = (q.right - w * .1) + "px"; el.style.top = (q.top + q.height / 2 - h / 2) + "px"; };
   el.style.width = w + "px"; el.style.height = h + "px";
+  const place = q => { el.style.left = (q.left + q.width / 2 - w / 2) + "px"; el.style.top = (q.top + q.height / 2 - h / 2 + 4) + "px"; };
   place(r);
 
-  // a point inside the plate's well, higher towards the middle (the heap)
-  const spot = () => {
-    const a = rand(0, Math.PI * 2), d = Math.sqrt(Math.random());
-    const x = 60 + Math.cos(a) * d * 36, y = 47 + Math.sin(a) * d * 14;
-    return [x, y - (1 - d) * 9];
+  // somewhere in the food: a heap, higher in the middle
+  const spot = (spread = 1) => {
+    const a = rand(0, Math.PI * 2), d = Math.sqrt(Math.random()) * spread;
+    return { x: 70 + Math.cos(a) * d * 39, y: 54 + Math.sin(a) * d * 14 - (1 - d) * 13, d };
   };
-  const pieces = [];
-  let t = .35;
-  // pasta ribbons first
-  for (let k = 0; k < 26; k++) {
-    const [x, y] = spot();
-    const col = pick(["#7d6452", "#8a705c", "#715a49", "#93796a"]);
-    pieces.push('<rect class="pz" x="' + (x - 9).toFixed(1) + '" y="' + (y - 2).toFixed(1) + '" width="' + rand(14, 21).toFixed(1) + '" height="' + rand(3.6, 5).toFixed(1) + '" rx="1.6" fill="' + col + '" style="--d:' + t.toFixed(2) + 's;--r:' + rand(-70, 70).toFixed(0) + 'deg"/>');
-    t += rand(.03, .07);
-    // potato and cabbage tumble in between
-    if (Math.random() < .3) { const [px, py] = spot(); pieces.push('<rect class="pz" x="' + (px - 3).toFixed(1) + '" y="' + (py - 3).toFixed(1) + '" width="' + rand(5, 7).toFixed(1) + '" height="' + rand(5, 6.5).toFixed(1) + '" rx="1.8" fill="' + pick(["#f2d488", "#efcf7b", "#f6dc98"]) + '" style="--d:' + t.toFixed(2) + 's;--r:' + rand(-40, 40).toFixed(0) + 'deg"/>'); }
-    if (Math.random() < .28) { const [cx, cy] = spot(); pieces.push('<path class="pz" d="M' + cx.toFixed(1) + " " + cy.toFixed(1) + " q" + rand(3, 6).toFixed(1) + " -" + rand(3, 5).toFixed(1) + " " + rand(8, 11).toFixed(1) + " 0 q-" + rand(2, 4).toFixed(1) + " " + rand(3, 5).toFixed(1) + ' -8 1 z" fill="' + pick(["#7fae5a", "#93bd6c", "#a8c97f", "#6f9e4c"]) + '" style="--d:' + t.toFixed(2) + 's;--r:' + rand(-60, 60).toFixed(0) + 'deg"/>'); }
+  const f = n => n.toFixed(1);
+  const items = [];
+  let t = .3;
+
+  // buckwheat ribbons: short, flat and wide, lying every which way, lighter on the edge that catches the light
+  for (let k = 0; k < 62; k++) {
+    const p = spot(), L = rand(13, 20), W = rand(4.6, 6.2), ang = rand(-80, 80), squash = rand(.5, .75);
+    const col = pick(["#6c5646", "#76604f", "#806a58", "#715b4a", "#86705e", "#7b6553"]);
+    const edge = pick(["#a28c78", "#9a8470", "#ad967f"]);
+    items.push({ y: p.y, html: '<g class="pz" style="--d:' + t.toFixed(2) + 's;--r:0deg"><g transform="translate(' + f(p.x) + " " + f(p.y) + ") scale(1 " + squash.toFixed(2) + ") rotate(" + ang.toFixed(0) + ')">' +
+      '<rect x="' + f(-L / 2) + '" y="' + f(-W / 2) + '" width="' + f(L) + '" height="' + f(W) + '" rx="1.4" fill="' + col + '"/>' +
+      '<rect x="' + f(-L / 2 + .8) + '" y="' + f(-W / 2 + .5) + '" width="' + f(L - 1.6) + '" height="1" rx=".5" fill="' + edge + '" opacity=".75"/>' +
+      '<rect x="' + f(-L / 2) + '" y="' + f(W / 2 - 1.1) + '" width="' + f(L) + '" height="1.1" rx=".5" fill="#4f3e32" opacity=".45"/></g></g>' });
+    t += rand(.02, .05);
+    if (Math.random() < .32) {                                       // a cube of potato
+      const q = spot(.95), s = rand(5.5, 7.5);
+      items.push({ y: q.y, html: '<g class="pz" style="--d:' + t.toFixed(2) + 's;--r:' + rand(-25, 25).toFixed(0) + 'deg">' +
+        '<rect x="' + f(q.x - s / 2) + '" y="' + f(q.y - s / 2) + '" width="' + f(s) + '" height="' + f(s * .85) + '" rx="1.3" fill="#f1d07c"/>' +
+        '<path d="M' + f(q.x - s / 2 + .6) + " " + f(q.y + s * .85 / 2 - .2) + " h" + f(s - 1.2) + " v-" + f(s * .35) + '" fill="none" stroke="#d6ad55" stroke-width="1.2" stroke-linecap="round"/>' +
+        '<rect x="' + f(q.x - s / 2 + .9) + '" y="' + f(q.y - s / 2 + .8) + '" width="' + f(s * .4) + '" height="1.1" rx=".5" fill="#fff4cf" opacity=".8"/></g>' });
+    }
+    if (Math.random() < .3) {                                        // a wisp of savoy cabbage
+      const q = spot(.95), s = rand(7, 11);
+      const g = pick(["#6e9d4a", "#7fae5a", "#93bd6c", "#5f8f40"]);
+      items.push({ y: q.y, html: '<g class="pz" style="--d:' + t.toFixed(2) + 's;--r:' + rand(-60, 60).toFixed(0) + 'deg">' +
+        '<path d="M' + f(q.x - s / 2) + " " + f(q.y) + " q" + f(s * .2) + " -" + f(s * .45) + " " + f(s * .5) + " -" + f(s * .35) + " q" + f(s * .3) + " " + f(s * .05) + " " + f(s * .5) + " " + f(s * .35) + " q-" + f(s * .5) + " " + f(s * .3) + " -" + f(s) + ' 0 z" fill="' + g + '"/>' +
+        '<path d="M' + f(q.x - s * .35) + " " + f(q.y - .3) + " q" + f(s * .35) + " -" + f(s * .2) + " " + f(s * .7) + ' 0" stroke="#c6e0a6" stroke-width=".7" fill="none" opacity=".8"/></g>' });
+    }
   }
-  // melted cheese over the top
-  t += .15;
-  for (let k = 0; k < 7; k++) {
-    const [x, y] = spot();
-    pieces.push('<ellipse class="pz cheese" cx="' + x.toFixed(1) + '" cy="' + (y - 2).toFixed(1) + '" rx="' + rand(5, 9).toFixed(1) + '" ry="' + rand(2, 3.4).toFixed(1) + '" fill="#f8e9b4" style="--d:' + t.toFixed(2) + 's"/>');
-    t += rand(.06, .12);
+  items.sort((a, b) => a.y - b.y);                                   // back to front
+
+  // melted cheese settling over the top, with a few strings
+  t += .12;
+  const cheese = [];
+  for (let k = 0; k < 11; k++) {
+    const p = spot(.85);
+    cheese.push('<g class="pz cheese" style="--d:' + t.toFixed(2) + 's">' +
+      '<path d="M' + f(p.x - rand(4, 7)) + " " + f(p.y - 1) + " q" + f(rand(3, 5)) + " -" + f(rand(1.5, 3)) + " " + f(rand(7, 12)) + " " + f(rand(-1, 1)) + " q-" + f(rand(2, 4)) + " " + f(rand(1.5, 3)) + " -" + f(rand(7, 12)) + ' 1 z" fill="url(#pzCheese)" opacity=".82"/>' +
+      (Math.random() < .6 ? '<path d="M' + f(p.x - 3) + " " + f(p.y) + " q" + f(rand(-2, 2)) + " " + f(rand(3, 5)) + " " + f(rand(1, 4)) + " " + f(rand(5, 8)) + '" stroke="#fbeab0" stroke-width="1" fill="none" stroke-linecap="round"/>' : "") + "</g>");
+    t += rand(.05, .1);
   }
-  // sage leaves and a gloss of butter
+  // fried sage
+  const sage = [];
   for (let k = 0; k < 3; k++) {
-    const [x, y] = spot();
-    pieces.push('<path class="pz" d="M' + x.toFixed(1) + " " + (y - 4).toFixed(1) + ' q4 -3 8 0 q-4 3 -8 0 z" fill="#8ea47c" style="--d:' + (t + k * .1).toFixed(2) + 's;--r:' + rand(-50, 50).toFixed(0) + 'deg"/>');
+    const p = spot(.7);
+    sage.push('<g class="pz" style="--d:' + (t + k * .12).toFixed(2) + 's;--r:' + rand(-60, 60).toFixed(0) + 'deg">' +
+      '<path d="M' + f(p.x - 5) + " " + f(p.y - 3) + ' q5 -4 10 0 q-5 4 -10 0 z" fill="#738f5e"/>' +
+      '<path d="M' + f(p.x - 4.4) + " " + f(p.y - 3) + ' h8.6" stroke="#a9bf95" stroke-width=".5"/></g>');
   }
-  const gloss = '<path class="pz gloss" d="M44 40 q8 -4 16 -1" style="--d:' + (t + .3).toFixed(2) + 's"/><path class="pz gloss" d="M64 37 q6 -3 11 0" style="--d:' + (t + .38).toFixed(2) + 's"/>';
-  const steamAt = t + .4;
-  const steam = [0, 1, 2].map(k => '<path class="steam" d="M' + (48 + k * 12) + ' 30 q-5 -7 0 -13 q5 -6 0 -13" style="--d:' + (steamAt + k * .5).toFixed(2) + 's;--sd:' + rand(2.2, 3.4).toFixed(2) + 's"/>').join("");
+  t += .4;
+  // a dusting of grana and a turn of pepper
+  const dust = [];
+  for (let k = 0; k < 26; k++) {
+    const p = spot(.9);
+    dust.push('<circle class="pz dust" cx="' + f(p.x) + '" cy="' + f(p.y - 2) + '" r="' + f(rand(.35, .8)) + '" fill="' + (Math.random() < .8 ? "#fffbe6" : "#3a332c") + '" style="--d:' + (t + rand(0, .35)).toFixed(2) + 's"/>');
+  }
+  const gloss = '<path class="pz gloss" d="M50 46 q9 -4 18 -1" style="--d:' + (t + .2).toFixed(2) + 's"/><path class="pz gloss" d="M74 43 q7 -3 13 0" style="--d:' + (t + .3).toFixed(2) + 's"/>';
+  const steamAt = t + .5;
+  const steam = [0, 1, 2, 3].map(k => '<path class="steam" d="M' + f(50 + k * 12 + rand(-3, 3)) + ' 36 q-' + f(rand(3, 6)) + ' -8 0 -15 q' + f(rand(3, 6)) + ' -7 0 -15" style="--d:' + (steamAt + k * rand(.3, .7)).toFixed(2) + 's;--sd:' + rand(2.4, 3.8).toFixed(2) + 's"/>').join("");
 
   el.innerHTML =
-    '<svg viewBox="0 0 120 80" aria-hidden="true">' +
-      '<defs><radialGradient id="pzPlate" cx=".45" cy=".35" r=".7"><stop offset="0" stop-color="#ffffff"/><stop offset=".75" stop-color="#f1f1ee"/><stop offset="1" stop-color="#dcdcd7"/></radialGradient>' +
-      '<radialGradient id="pzWell" cx=".5" cy=".45" r=".6"><stop offset="0" stop-color="#f7f7f4"/><stop offset="1" stop-color="#e4e4df"/></radialGradient></defs>' +
-      '<ellipse class="pz-shadow" cx="61" cy="56" rx="54" ry="15"/>' +
-      '<g class="pz-plate"><ellipse cx="60" cy="49" rx="56" ry="24" fill="url(#pzPlate)" stroke="#d6d6d1" stroke-width=".6"/>' +
-      '<ellipse cx="60" cy="48" rx="40" ry="16" fill="url(#pzWell)"/>' +
-      '<path d="M18 44 Q60 26 102 44" fill="none" stroke="#fff" stroke-width="1.2" opacity=".9"/></g>' +
-      pieces.join("") + gloss + steam +
+    '<svg viewBox="0 0 140 90" aria-hidden="true">' +
+      "<defs>" +
+        '<radialGradient id="pzRim" cx=".42" cy=".3" r=".75"><stop offset="0" stop-color="#ffffff"/><stop offset=".7" stop-color="#f3f3f0"/><stop offset="1" stop-color="#d4d4cf"/></radialGradient>' +
+        '<radialGradient id="pzWell" cx=".5" cy=".62" r=".62"><stop offset="0" stop-color="#fbfbf9"/><stop offset=".8" stop-color="#ececE8"/><stop offset="1" stop-color="#d9d9d4"/></radialGradient>' +
+        '<radialGradient id="pzCheese" cx=".4" cy=".35" r=".7"><stop offset="0" stop-color="#fff8dc"/><stop offset=".7" stop-color="#f6e3a4"/><stop offset="1" stop-color="#e8cc7e" stop-opacity=".8"/></radialGradient>' +
+      "</defs>" +
+      '<ellipse class="pz-shadow" cx="72" cy="66" rx="62" ry="17"/>' +
+      '<g class="pz-plate">' +
+        '<ellipse cx="70" cy="58" rx="64" ry="27" fill="#cfcfca"/>' +                     // the plate's edge seen from the side
+        '<ellipse cx="70" cy="56" rx="64" ry="27" fill="url(#pzRim)"/>' +
+        '<ellipse cx="70" cy="55.5" rx="46" ry="18.5" fill="url(#pzWell)"/>' +
+        '<path d="M24 55.5 A46 18.5 0 0 1 116 55.5" fill="none" stroke="#c9c9c4" stroke-width=".8" opacity=".8"/>' +  // the well's lip in shade
+        '<path d="M14 50 Q70 26 126 50" fill="none" stroke="#fff" stroke-width="1.6" opacity=".95"/>' +               // light on the rim
+      "</g>" +
+      items.map(i => i.html).join("") + cheese.join("") + sage.join("") + dust.join("") + gloss + steam +
     "</svg>";
   document.body.appendChild(el);
   const follow = setInterval(() => { const q = cellRect(date); if (q) place(q); }, 100);
