@@ -72,6 +72,19 @@ const longDate = s => { const t = parse(s); return DAYS[dow(t)] + " " + t.getDat
 const shortDate = s => { const t = parse(s); return DAY3[dow(t)] + " " + t.getDate() + " " + MON3[t.getMonth()]; };
 const isFree = s => { const t = parse(s); return dow(t) >= 5 || !!HOLIDAYS[s]; };
 const rand = (a, b) => a + Math.random() * (b - a);
+// handwriting in marker: the same every time you look, but no two letters alike
+function seeded(str) { let h = 2166136261; for (const ch of str) h = Math.imul(h ^ ch.charCodeAt(0), 16777619); return () => { h += 0x6D2B79F5; let t = h; t = Math.imul(t ^ t >>> 15, t | 1); t ^= t + Math.imul(t ^ t >>> 7, t | 61); return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+function scribbleHTML(text, key) {
+  const R = seeded(key), between = (a, b) => a + R() * (b - a);
+  const angle = between(-10, 7), size = between(14, 17.5), squash = between(.92, 1.08), weight = R() < .4 ? " heavy" : "";
+  let wave = between(0, 6.28);
+  const letters = text.split(" ").map(word => '<span class="w">' + [...word].map(ch => {
+    wave += between(.5, 1.1);
+    const dy = Math.sin(wave) * between(.6, 2.2) + between(-.8, .8);
+    return '<span style="transform:translateY(' + dy.toFixed(1) + 'px) rotate(' + between(-7, 7).toFixed(1) + 'deg) scale(' + between(.9, 1.12).toFixed(2) + ')">' + ch + "</span>";
+  }).join("") + "</span>").join(" ");
+  return '<span class="scribble' + weight + '" style="--tilt:' + angle.toFixed(1) + 'deg;font-size:' + size.toFixed(1) + 'px;--sx:' + squash.toFixed(2) + '" aria-label="' + text.replace(/"/g, "&quot;") + '">' + letters + "</span>";
+}
 // a stable little angle for a sticky note, from its person and day
 const tilt = s => { let h = 7; for (const ch of s) h = (h * 31 + ch.charCodeAt(0)) >>> 0; return ((h % 900) / 100 - 4.5).toFixed(1); };
 
@@ -158,7 +171,7 @@ function sheetHTML(i) {
     const eggAttr = egg ? ' data-egg="' + egg + '"' : "";
     let inner = '<span class="n">' + t.getDate() + "</span>";
     if (hol && inM) inner += '<span class="hn">' + hol + "</span>";
-    if (SCRIBBLES[date] && inM) inner += '<span class="scribble" style="--tilt:' + tilt("s" + date) + 'deg">' + SCRIBBLES[date] + "</span>";
+    if (SCRIBBLES[date] && inM) inner += scribbleHTML(SCRIBBLES[date], date);
     if (inM && !isFree(date)) {
       const off = offOn(date);
       if (off.length) {
@@ -446,6 +459,73 @@ function toggleMine(date) {
   if (on) afterBooking(id, date);
 }
 
+/* ---------------- lights behind frosted glass ----------------
+   Strings of big vintage bulbs hang behind the page. A sheet of frosted
+   glass sits in front of them, so you only see soft coloured glows that
+   slowly change colour and breathe. Quiet enough to stay in the background. */
+function initLights() {
+  const room = $("#room");
+  if (!room) return;
+  let built = 0;
+  function build() {
+    const W = innerWidth, H = innerHeight;
+    if (Math.abs(W - built) < 40 && room.childElementCount) return;
+    built = W;
+    room.innerHTML = "";
+    const svgNS = "http://www.w3.org/2000/svg";
+    const wires = document.createElementNS(svgNS, "svg");
+    wires.setAttribute("class", "wires");
+    wires.setAttribute("viewBox", "0 0 " + W + " " + H);
+    wires.setAttribute("preserveAspectRatio", "none");
+    room.appendChild(wires);
+
+    // three strings: one sagging across the top, one along the bottom, one looping down the right
+    const strings = [
+      { from: [-.05 * W, .04 * H], to: [1.05 * W, .09 * H], sag: .16 * H },
+      { from: [-.05 * W, .9 * H],  to: [1.05 * W, .84 * H], sag: .1 * H },
+      { from: [.97 * W, -.05 * H], to: [.9 * W, 1.05 * H],  sag: -.07 * W, vertical: true }
+    ];
+    let n = 0;
+    for (const s of strings) {
+      const pts = [];
+      for (let k = 0; k <= 40; k++) {
+        const t = k / 40;
+        const x = s.from[0] + (s.to[0] - s.from[0]) * t, y = s.from[1] + (s.to[1] - s.from[1]) * t;
+        const bow = s.sag * 4 * t * (1 - t);
+        pts.push(s.vertical ? [x + bow, y] : [x, y + bow]);
+      }
+      const path = document.createElementNS(svgNS, "path");
+      path.setAttribute("d", "M" + pts.map(p => p[0].toFixed(1) + " " + p[1].toFixed(1)).join(" L"));
+      wires.appendChild(path);
+
+      const len = s.vertical ? H : W;
+      const count = Math.max(4, Math.round(len / 190));
+      for (let b = 0; b < count; b++) {
+        const t = (b + .5 + rand(-.18, .18)) / count;
+        const i = Math.min(39, Math.floor(t * 40));
+        const [x, y] = pts[i], [x2, y2] = pts[i + 1];
+        const along = Math.atan2(y2 - y, x2 - x) * 180 / Math.PI;
+        // bulbs hang off the wire, roughly downward (or outward on the side string)
+        const hang = (s.vertical ? along - 90 : along + 90) + rand(-28, 28);
+        const bulb = document.createElement("div");
+        bulb.className = "bulb";
+        const size = rand(.85, 1.2);
+        bulb.style.cssText =
+          "left:" + x.toFixed(0) + "px;top:" + y.toFixed(0) + "px;" +
+          "--rot:" + (hang - 90).toFixed(1) + "deg;--s:" + size.toFixed(2) + ";" +
+          "--dur:" + rand(38, 70).toFixed(1) + "s;--delay:" + (-rand(0, 70)).toFixed(1) + "s;" +
+          "--bdur:" + rand(5, 11).toFixed(1) + "s;--bdelay:" + (-rand(0, 11)).toFixed(1) + "s";
+        bulb.innerHTML = '<i class="glow"></i><i class="socket"></i><i class="glass"></i>';
+        room.appendChild(bulb);
+        n++;
+      }
+    }
+  }
+  build();
+  let t;
+  addEventListener("resize", () => { clearTimeout(t); t = setTimeout(build, 250); });
+}
+
 /* ---------------- the plane ----------------
    It rests on an empty square (never on anyone's name). The pointer pushes
    it softly, like the snow used to: it slides ahead of the cursor, gets
@@ -647,7 +727,7 @@ function planeRoll() {
 
 /* ---------------- easter eggs ---------------- */
 const EGG_DATES = {
-  "2026-12-24": "eve", "2026-12-25": "xmas", "2026-12-31": "nye", "2027-01-01": "newyear",
+  "2026-12-08": "pizzoccheri", "2026-12-24": "eve", "2026-12-25": "xmas", "2026-12-31": "nye", "2027-01-01": "newyear",
   "2027-01-06": "befana", "2027-02-09": "carnival", "2027-02-14": "valentine"
 };
 
@@ -685,6 +765,7 @@ function startEgg(cell) {
       burst(x, y, randInt(6, 14), pick(STAR_SETS), "star", rand(35, 80));
     }),
     xmas: () => christmasTree(date),
+    pizzoccheri: () => pizzoccheri(date),
     nye: () => loop(date, [350, 1100], r => {
       const x = r.left + r.width * rand(-.2, 1.2), y = r.top - rand(-10, 120);
       burst(x, y, randInt(14, 28), pick(FIRE_SETS), "dot", rand(45, 100));
@@ -753,6 +834,72 @@ function christmasTree(date) {
     const q = cellRect(date); if (!q) return;
     el.style.left = (q.right - w - 8) + "px"; el.style.top = (q.bottom - h - 6) + "px";
   }, 100);
+  return () => {
+    clearInterval(follow);
+    el.classList.add("out");
+    setTimeout(() => el.remove(), 420);
+  };
+}
+
+// 8 December (Gian's birthday): a plate of pizzoccheri fills up — buckwheat
+// ribbons, potato, savoy cabbage, melting cheese, sage — then it steams.
+// Every time the plate is filled a little differently.
+function pizzoccheri(date) {
+  const r = cellRect(date);
+  const w = Math.max(110, Math.min(176, r.width * 1.05)), h = w * 80 / 120;
+  const el = document.createElement("div");
+  el.className = "pizz";
+  // served beside the day, leaning into the next square, so the writing on the 8th stays readable
+  const place = q => { el.style.left = (q.right - w * .1) + "px"; el.style.top = (q.top + q.height / 2 - h / 2) + "px"; };
+  el.style.width = w + "px"; el.style.height = h + "px";
+  place(r);
+
+  // a point inside the plate's well, higher towards the middle (the heap)
+  const spot = () => {
+    const a = rand(0, Math.PI * 2), d = Math.sqrt(Math.random());
+    const x = 60 + Math.cos(a) * d * 36, y = 47 + Math.sin(a) * d * 14;
+    return [x, y - (1 - d) * 9];
+  };
+  const pieces = [];
+  let t = .35;
+  // pasta ribbons first
+  for (let k = 0; k < 26; k++) {
+    const [x, y] = spot();
+    const col = pick(["#7d6452", "#8a705c", "#715a49", "#93796a"]);
+    pieces.push('<rect class="pz" x="' + (x - 9).toFixed(1) + '" y="' + (y - 2).toFixed(1) + '" width="' + rand(14, 21).toFixed(1) + '" height="' + rand(3.6, 5).toFixed(1) + '" rx="1.6" fill="' + col + '" style="--d:' + t.toFixed(2) + 's;--r:' + rand(-70, 70).toFixed(0) + 'deg"/>');
+    t += rand(.03, .07);
+    // potato and cabbage tumble in between
+    if (Math.random() < .3) { const [px, py] = spot(); pieces.push('<rect class="pz" x="' + (px - 3).toFixed(1) + '" y="' + (py - 3).toFixed(1) + '" width="' + rand(5, 7).toFixed(1) + '" height="' + rand(5, 6.5).toFixed(1) + '" rx="1.8" fill="' + pick(["#f2d488", "#efcf7b", "#f6dc98"]) + '" style="--d:' + t.toFixed(2) + 's;--r:' + rand(-40, 40).toFixed(0) + 'deg"/>'); }
+    if (Math.random() < .28) { const [cx, cy] = spot(); pieces.push('<path class="pz" d="M' + cx.toFixed(1) + " " + cy.toFixed(1) + " q" + rand(3, 6).toFixed(1) + " -" + rand(3, 5).toFixed(1) + " " + rand(8, 11).toFixed(1) + " 0 q-" + rand(2, 4).toFixed(1) + " " + rand(3, 5).toFixed(1) + ' -8 1 z" fill="' + pick(["#7fae5a", "#93bd6c", "#a8c97f", "#6f9e4c"]) + '" style="--d:' + t.toFixed(2) + 's;--r:' + rand(-60, 60).toFixed(0) + 'deg"/>'); }
+  }
+  // melted cheese over the top
+  t += .15;
+  for (let k = 0; k < 7; k++) {
+    const [x, y] = spot();
+    pieces.push('<ellipse class="pz cheese" cx="' + x.toFixed(1) + '" cy="' + (y - 2).toFixed(1) + '" rx="' + rand(5, 9).toFixed(1) + '" ry="' + rand(2, 3.4).toFixed(1) + '" fill="#f8e9b4" style="--d:' + t.toFixed(2) + 's"/>');
+    t += rand(.06, .12);
+  }
+  // sage leaves and a gloss of butter
+  for (let k = 0; k < 3; k++) {
+    const [x, y] = spot();
+    pieces.push('<path class="pz" d="M' + x.toFixed(1) + " " + (y - 4).toFixed(1) + ' q4 -3 8 0 q-4 3 -8 0 z" fill="#8ea47c" style="--d:' + (t + k * .1).toFixed(2) + 's;--r:' + rand(-50, 50).toFixed(0) + 'deg"/>');
+  }
+  const gloss = '<path class="pz gloss" d="M44 40 q8 -4 16 -1" style="--d:' + (t + .3).toFixed(2) + 's"/><path class="pz gloss" d="M64 37 q6 -3 11 0" style="--d:' + (t + .38).toFixed(2) + 's"/>';
+  const steamAt = t + .4;
+  const steam = [0, 1, 2].map(k => '<path class="steam" d="M' + (48 + k * 12) + ' 30 q-5 -7 0 -13 q5 -6 0 -13" style="--d:' + (steamAt + k * .5).toFixed(2) + 's;--sd:' + rand(2.2, 3.4).toFixed(2) + 's"/>').join("");
+
+  el.innerHTML =
+    '<svg viewBox="0 0 120 80" aria-hidden="true">' +
+      '<defs><radialGradient id="pzPlate" cx=".45" cy=".35" r=".7"><stop offset="0" stop-color="#ffffff"/><stop offset=".75" stop-color="#f1f1ee"/><stop offset="1" stop-color="#dcdcd7"/></radialGradient>' +
+      '<radialGradient id="pzWell" cx=".5" cy=".45" r=".6"><stop offset="0" stop-color="#f7f7f4"/><stop offset="1" stop-color="#e4e4df"/></radialGradient></defs>' +
+      '<ellipse class="pz-shadow" cx="61" cy="56" rx="54" ry="15"/>' +
+      '<g class="pz-plate"><ellipse cx="60" cy="49" rx="56" ry="24" fill="url(#pzPlate)" stroke="#d6d6d1" stroke-width=".6"/>' +
+      '<ellipse cx="60" cy="48" rx="40" ry="16" fill="url(#pzWell)"/>' +
+      '<path d="M18 44 Q60 26 102 44" fill="none" stroke="#fff" stroke-width="1.2" opacity=".9"/></g>' +
+      pieces.join("") + gloss + steam +
+    "</svg>";
+  document.body.appendChild(el);
+  const follow = setInterval(() => { const q = cellRect(date); if (q) place(q); }, 100);
   return () => {
     clearInterval(follow);
     el.classList.add("out");
@@ -987,6 +1134,7 @@ function init() {
   renderSheet();
   renderNav();
   renderMe();
+  initLights();
   initPlane();
   if (!state.me) openWho("pick");
   initFirebase();
