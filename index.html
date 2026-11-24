@@ -3,142 +3,99 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Holiday Planner — Lightship Chartering Genova, Summer 2026</title>
+<title>Winter Holiday Planner — Lightship Chartering Genova</title>
+<meta name="theme-color" content="#efefed" />
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;0,9..144,700;1,9..144,400;1,9..144,500;1,9..144,600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Jost:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
 
-  <header class="hero">
-    <div class="hero-bg" aria-hidden="true"></div>
-    <div class="container hero-inner">
-      <div class="hero-brand">
-        <svg class="hero-mark" viewBox="0 0 36 36" aria-label="Lightship Chartering Genova">
-          <defs>
-            <linearGradient id="sailGrad" x1="0" y1="0" x2="1" y2="1">
-              <stop offset="0" stop-color="#fef3c7"/>
-              <stop offset="1" stop-color="#ffffff"/>
-            </linearGradient>
-          </defs>
-          <circle cx="18" cy="18" r="17" fill="#0c2340"/>
-          <circle cx="18" cy="18" r="17" fill="none" stroke="#f59e0b" stroke-width="0.5" stroke-dasharray="1 2" opacity="0.5"/>
-          <path d="M19 7 L19 24 L29 24 Z" fill="url(#sailGrad)" opacity="0.95"/>
-          <path d="M17 8 L17 24 L9 24 Z" fill="#ffffff" opacity="0.55"/>
-          <line x1="18" y1="6" x2="18" y2="26" stroke="#ffffff" stroke-width="1" stroke-linecap="round"/>
-          <path d="M5 27 Q9 26 13 27 T21 27 T29 27 T31 27" stroke="#f59e0b" stroke-width="1.2" stroke-linecap="round" fill="none"/>
-          <path d="M5 30 Q9 29 13 30 T21 30 T29 30 T31 30" stroke="#ffffff" stroke-width="1" stroke-linecap="round" fill="none" opacity="0.6"/>
-        </svg>
-        <div class="hero-text">
-          <p class="eyebrow">Lightship Chartering Genova</p>
-          <h1 class="display"><em>Holiday</em> Planner</h1>
-          <p class="hero-sub">Summer Season 2026</p>
-        </div>
+  <main class="desk">
+    <header class="top">
+      <p class="brand"><strong>Lightship Chartering Genova</strong><span>Holiday planner · Winter 2026–27</span></p>
+      <nav class="months" id="months" aria-label="Choose month"></nav>
+      <div class="right">
+        <p id="me" class="me" hidden></p>
+        <p id="sync" class="sync" aria-live="polite"><i></i><span>Connecting</span></p>
       </div>
-      <div id="hero-identity" class="hero-identity" hidden></div>
-    </div>
-    <svg class="hero-wave" viewBox="0 0 1440 24" preserveAspectRatio="none" aria-hidden="true">
-      <path d="M0,12 Q120,4 240,12 T480,12 T720,12 T960,12 T1200,12 T1440,12" stroke="rgba(12,35,64,0.10)" stroke-width="1" fill="none"/>
-      <path d="M0,18 Q120,10 240,18 T480,18 T720,18 T960,18 T1200,18 T1440,18" stroke="rgba(245,158,11,0.20)" stroke-width="1" fill="none"/>
-    </svg>
-  </header>
+    </header>
 
-  <section class="identity-bar">
-    <div class="container">
-      <div id="dept-list" class="dept-list"></div>
-    </div>
-  </section>
-
-  <section class="month-meta">
-    <div class="container month-meta-inner">
-      <div class="month-display">
-        <h2 id="active-month-name">July</h2>
-        <span class="month-year" id="active-month-year">2026</span>
+    <section class="pad" id="pad">
+      <div class="glue" aria-hidden="true"></div>
+      <div class="sheets" id="sheets">
+        <div class="sheet" id="sheet"></div>
       </div>
-      <div class="month-controls">
-        <span class="kbd-row">
-          <kbd>&larr;</kbd><kbd>&rarr;</kbd>
-          <span class="kbd-label">to navigate</span>
-        </span>
-        <div class="month-nav-group">
-          <button id="month-prev" class="step-btn" aria-label="Previous month">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
-          </button>
-          <div id="month-tabs" class="month-tabs"></div>
-          <button id="month-next" class="step-btn" aria-label="Next month">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
-          </button>
-        </div>
-      </div>
-    </div>
-  </section>
 
-  <main class="container main-grid">
-    <section class="month-stage">
-      <div id="month-view" class="month-view"></div>
-      <div class="mini-strip">
-        <div class="mini-strip-head">
-          <h3 class="mini-strip-title">Other months</h3>
-          <ul class="mini-legend">
-            <li><span class="heat-swatch heat-1"></span>1 off</li>
-            <li><span class="heat-swatch heat-2"></span>2</li>
-            <li><span class="heat-swatch heat-3"></span>3</li>
-            <li><span class="heat-swatch heat-4"></span>4+</li>
-          </ul>
+      <!-- A toy plane that wanders around the calendar, never parking on anyone's name. -->
+      <div class="props" id="props" aria-hidden="true">
+
+        <div class="prop" data-prop="plane">
+          <div class="shadow"><div class="rot">
+            <svg viewBox="0 0 400 400">
+              <path d="M184 160 L36 258 C30 263 31 271 40 272 L184 226 Z M216 160 L364 258 C370 263 369 271 360 272 L216 226 Z M186 318 L126 352 C121 356 122 362 129 362 L188 348 Z M214 318 L274 352 C279 356 278 362 271 362 L212 348 Z"/>
+              <path d="M200 22 C214 22 219 50 219 80 L219 330 C219 352 210 372 200 378 C190 372 181 352 181 330 L181 80 C181 50 186 22 200 22 Z"/>
+              <rect x="112" y="186" width="22" height="58" rx="11"/><rect x="266" y="186" width="22" height="58" rx="11"/>
+            </svg>
+          </div></div>
+          <div class="body"><div class="rot">
+            <svg viewBox="0 0 400 400">
+              <defs>
+                <linearGradient id="pl-body" x1="0" x2="1">
+                  <stop offset="0" stop-color="#c3c9d0"/><stop offset=".2" stop-color="#eceef1"/>
+                  <stop offset=".46" stop-color="#ffffff"/><stop offset=".72" stop-color="#f1f3f5"/>
+                  <stop offset="1" stop-color="#b8bfc8"/>
+                </linearGradient>
+                <linearGradient id="pl-wing" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#dde1e6"/>
+                </linearGradient>
+                <linearGradient id="pl-eng" x1="0" x2="1">
+                  <stop offset="0" stop-color="#b3bac3"/><stop offset=".45" stop-color="#fafbfc"/><stop offset="1" stop-color="#c9cfd6"/>
+                </linearGradient>
+                <radialGradient id="pl-intake" cx=".5" cy=".5" r=".6">
+                  <stop offset="0" stop-color="#2a3037"/><stop offset="1" stop-color="#6d7680"/>
+                </radialGradient>
+                <radialGradient id="pl-root" cx=".5" cy=".5" r=".5">
+                  <stop offset="0" stop-color="#5d6773" stop-opacity=".22"/><stop offset="1" stop-color="#5d6773" stop-opacity="0"/>
+                </radialGradient>
+              </defs>
+              <!-- wings -->
+              <path d="M184 160 L36 258 C30 263 31 271 40 272 L184 226 Z" fill="url(#pl-wing)" stroke="#cdd2d8" stroke-width="1"/>
+              <path d="M216 160 L364 258 C370 263 369 271 360 272 L216 226 Z" fill="url(#pl-wing)" stroke="#cdd2d8" stroke-width="1"/>
+              <path d="M184 162 L38 259" stroke="#fff" stroke-width="2" stroke-linecap="round"/>
+              <path d="M216 162 L362 259" stroke="#fff" stroke-width="2" stroke-linecap="round"/>
+              <path d="M70 255 L184 218 M330 255 L216 218" stroke="#c4cad1" stroke-width=".8" opacity=".7"/>
+              <!-- engines -->
+              <rect x="112" y="186" width="22" height="58" rx="11" fill="url(#pl-eng)" stroke="#c3c9d0" stroke-width=".8"/>
+              <rect x="266" y="186" width="22" height="58" rx="11" fill="url(#pl-eng)" stroke="#c3c9d0" stroke-width=".8"/>
+              <ellipse cx="123" cy="190" rx="8.5" ry="4" fill="url(#pl-intake)"/>
+              <ellipse cx="277" cy="190" rx="8.5" ry="4" fill="url(#pl-intake)"/>
+              <!-- tailplane -->
+              <path d="M186 318 L126 352 C121 356 122 362 129 362 L188 348 Z" fill="url(#pl-wing)" stroke="#cdd2d8" stroke-width="1"/>
+              <path d="M214 318 L274 352 C279 356 278 362 271 362 L212 348 Z" fill="url(#pl-wing)" stroke="#cdd2d8" stroke-width="1"/>
+              <!-- fuselage -->
+              <ellipse cx="200" cy="195" rx="44" ry="40" fill="url(#pl-root)"/>
+              <path d="M200 22 C214 22 219 50 219 80 L219 330 C219 352 210 372 200 378 C190 372 181 352 181 330 L181 80 C181 50 186 22 200 22 Z" fill="url(#pl-body)" stroke="#c7cdd4" stroke-width=".8"/>
+              <path d="M193 60 Q200 54 207 60" stroke="#8f99a4" stroke-width="2.2" fill="none" stroke-linecap="round" opacity=".55"/>
+              <ellipse cx="196" cy="74" rx="6" ry="26" fill="#fff" opacity=".8"/>
+              <!-- fin seen from above -->
+              <path d="M197.5 292 L202.5 292 L204 376 C202.5 381 197.5 381 196 376 Z" fill="#dfe3e8" stroke="#c3c9d0" stroke-width=".6"/>
+            </svg>
+          </div></div>
         </div>
-        <div id="mini-months" class="mini-months"></div>
       </div>
     </section>
 
-    <aside class="side-panel">
-      <section class="card">
-        <h3>Filter</h3>
-        <p class="hint">Show or hide people on the grid.</p>
-        <div class="filter-actions">
-          <button id="filter-all" class="chip-btn">All</button>
-          <button id="filter-none" class="chip-btn">None</button>
-          <button id="filter-mine" class="chip-btn">Only me</button>
-        </div>
-        <div id="filter-list" class="filter-list"></div>
-      </section>
-
-      <section class="card">
-        <h3>Summary</h3>
-        <div id="summary" class="summary"></div>
-      </section>
-
-      <section class="card">
-        <h3>Legend</h3>
-        <ul class="legend">
-          <li><span class="dot dot-weekend"></span>Weekend</li>
-          <li><span class="dot dot-holiday"></span>Public holiday <span class="legend-tag">IT</span></li>
-          <li><span class="dot dot-conflict"></span>Same-department conflict</li>
-        </ul>
-      </section>
-    </aside>
+    <p class="how">Click a working day to book it off. Click it again to cancel. Weekends and public holidays are already free.</p>
   </main>
 
-  <footer class="footer">
-    <div class="container footer-inner">
-      <span class="footer-mark">Lightship Chartering Genova &middot; <em>Summer 2026</em></span>
-      <span id="status" class="status"></span>
-    </div>
-  </footer>
+  <div id="tear-layer" class="tear-layer" aria-hidden="true"></div>
 
-  <div id="pending-bar" class="pending-bar" hidden>
-    <div class="pending-bar-inner container">
-      <span id="pending-summary" class="pending-summary"></span>
-      <div class="pending-actions">
-        <button id="btn-discard" class="btn btn-link">Discard</button>
-        <button id="btn-confirm" class="btn btn-primary">Confirm</button>
-      </div>
-    </div>
-  </div>
+  <div id="who" class="who" role="dialog" aria-modal="true" aria-labelledby="who-title" hidden></div>
 
-  <div id="toast" class="toast" hidden></div>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
-  <!-- Firebase SDK — compat mode so we can keep using firebase.database() -->
   <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-database-compat.js"></script>
   <script src="app.js"></script>

@@ -1,59 +1,37 @@
 /* ============================================================
-   Lightship Genova — Holiday Planner 2026
-   "A Lightship Summer" — editorial spreadsheet view.
+   Lightship Genova — Winter Holiday Planner (Dec 2026 – Feb 2027)
+   A tear-off desk calendar. Click a day, tick who's off. Saved
+   for everyone in real time. No login.
    ============================================================ */
 
-const YEAR = 2026;
-const MONTHS = [6, 7, 8];
-
-const MONTH_NAMES = ["January","February","March","April","May","June","July","August","September","October","November","December"];
-const MONTH_SHORT = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
-const WEEKDAY_LABELS = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
-const WEEKDAY_SHORT = ["M","T","W","T","F","S","S"];
+const SEASON = [[2026, 11], [2027, 0], [2027, 1]];             // [year, month0]
+const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+const MON3   = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+const DAYS   = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"];
+const DAY3   = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
 
 const HOLIDAYS = {
-  "2026-05-01": "Labour Day",
-  "2026-06-02": "Republic Day",
-  "2026-08-15": "Ferragosto"
+  "2026-12-08": "Immacolata",
+  "2026-12-25": "Christmas",
+  "2026-12-26": "St Stephen",
+  "2027-01-01": "New Year",
+  "2027-01-06": "Epiphany",
 };
 
 const DEPARTMENTS = [
-  { name: "Broker — Gearless", key: "gearless",  members: ["OPE", "MPE", "LDC", "BEE", "MCD"] },
-  { name: "Broker — Geared",   key: "geared",    members: ["SDP", "FGA"] },
-  { name: "Back Office",       key: "backoffice",members: ["MST", "GBE", "CPA", "GCS"] },
-  { name: "Sale and Purchase", key: "snp",       members: ["FEG", "ACR"] },
+  { name: "Broker — Gearless", key: "gearless",   members: ["OPE", "MPE", "LDC", "BEE", "MCD"] },
+  { name: "Broker — Geared",   key: "geared",     members: ["SDP", "FGA"] },
+  { name: "Back Office",       key: "backoffice", members: ["MST", "GBE", "CPA", "GCS"] },
+  { name: "Sale and Purchase", key: "snp",        members: ["FEG", "ACR"] },
 ];
+const PALETTE = ["#1677c2","#e0313f","#f2a93b","#2f9e6e","#7b5cd6","#0fa3b1","#e56b2f","#c23b8c","#5a8f29","#3d5a98","#d4a017","#8c5a3c","#4aa3df"];
+const EMPLOYEES = [];
+DEPARTMENTS.forEach(d => d.members.forEach(id => EMPLOYEES.push({ id, dept: d.key, deptName: d.name, color: PALETTE[EMPLOYEES.length] })));
+const EMP = Object.fromEntries(EMPLOYEES.map(e => [e.id, e]));
 
-/* Curated summer palette — saturated but not neon */
-const PALETTE = [
-  "#e63946", "#f4a261", "#e9c46a", "#8ab17d", "#2a9d8f",
-  "#0a9396", "#0077b6", "#3a86ff", "#7b2cbf", "#9d4edd",
-  "#c9184a", "#d62828", "#e76f51"
-];
-
-const EMPLOYEES = (() => {
-  let i = 0; const list = [];
-  for (const d of DEPARTMENTS) {
-    for (const m of d.members) {
-      list.push({ id: m, dept: d.key, deptName: d.name, color: PALETTE[i % PALETTE.length] });
-      i++;
-    }
-  }
-  return list;
-})();
-const EMP_BY_ID = Object.fromEntries(EMPLOYEES.map(e => [e.id, e]));
-
-const URL_PARAMS = new URLSearchParams(location.search);
-const ADMIN_MODE = URL_PARAMS.get("admin") === "1";
-const STORAGE_KEY = "lightship-holiday-planner-v3";
-const ADMIN_PASSWORD = "lightship2026"; // change this if needed
-
-/* ============================================================
-   REMOTE BACKEND (Firebase Realtime Database) — shared selections for everyone.
-   Firebase provides atomic per-child writes: setting selections/GCS ONLY writes
-   that node without touching anyone else's. No read-merge-write race, no wipe
-   possible from a client bug. Free tier: 10GB/month bandwidth — plenty for us.
-   ============================================================ */
+/* Same database as the summer planner. Dates carry the year, and every
+   change is an atomic transaction on one person's list, so nothing else
+   is ever touched. */
 const FIREBASE_CONFIG = {
   apiKey: "AIzaSyDqKWZ_fYtIIXdasEHX5atCwJ995rjFMZg",
   authDomain: "lightship-holiday-planner.firebaseapp.com",
@@ -63,953 +41,801 @@ const FIREBASE_CONFIG = {
   messagingSenderId: "545676531164",
   appId: "1:545676531164:web:fcd376a877d56a89912b19"
 };
-const BACKUP_KEY = "lightship-holiday-planner-v3-data";
-const SNAPSHOTS_KEY = "lightship-holiday-planner-v3-snapshots";  // ring buffer — NEVER wiped by pulls
-const SNAPSHOT_KEEP = 30;
-const SNAPSHOT_MIN_GAP_MS = 5 * 60 * 1000;
-const POLL_INTERVAL_MS = 60000;  // safety fallback poll (real-time listener does the real work)
+const CACHE_KEY = "lightship-winter-2627-cache";
+const DRY_RUN = new URLSearchParams(location.search).get("dry") === "1";   // try it without saving
+const REDUCED = matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-let pushInProgress = false;
-let pushPendingAgain = false;
-let firebaseDb = null;      // firebase.database() reference
-let firebaseReady = false;  // set to true when the initial value snapshot has arrived
-let firebaseFailed = false; // set to true if SDK failed to load or init
+const state = { month: 0, sel: {}, me: null, who: null, whoPick: null, tearing: false, queued: null };
+let db = null;
+const $ = s => document.querySelector(s);
 
+/* ---------------- helpers ---------------- */
+const iso = (y, m, d) => { const t = new Date(y, m, d); return t.getFullYear() + "-" + String(t.getMonth() + 1).padStart(2, "0") + "-" + String(t.getDate()).padStart(2, "0"); };
+const parse = s => { const [y, m, d] = s.split("-").map(Number); return new Date(y, m - 1, d); };
+const dow = t => (t.getDay() + 6) % 7;                          // Mon = 0
+const todayIso = () => { const t = new Date(); return iso(t.getFullYear(), t.getMonth(), t.getDate()); };
+const toList = v => Array.isArray(v) ? v.filter(Boolean) : (v && typeof v === "object" ? Object.values(v) : []);
+const has = (id, date) => !!(state.sel[id] && state.sel[id].has(date));
+const offOn = date => EMPLOYEES.filter(e => has(e.id, date));
+const clashOf = (date, emp) => DEPARTMENTS.find(d => d.key === emp.dept).members.some(o => o !== emp.id && has(o, date));
+const longDate = s => { const t = parse(s); return DAYS[dow(t)] + " " + t.getDate() + " " + MONTHS[t.getMonth()]; };
+const shortDate = s => { const t = parse(s); return DAY3[dow(t)] + " " + t.getDate() + " " + MON3[t.getMonth()]; };
+const isFree = s => { const t = parse(s); return dow(t) >= 5 || !!HOLIDAYS[s]; };
+const rand = (a, b) => a + Math.random() * (b - a);
 
-// FLIP technique: animate hero-brand smoothly between centered and left positions.
-function transitionBrandPosition(applyChange) {
-  const brand = document.querySelector(".hero-brand");
-  const heroId = document.querySelector(".hero-identity");
-  if (!brand) { applyChange(); return; }
-  const oldRect = brand.getBoundingClientRect();
-  applyChange();
-  const newRect = brand.getBoundingClientRect();
-  const dx = oldRect.left - newRect.left;
-  if (Math.abs(dx) > 1) {
-    brand.animate(
-      [
-        { transform: "translateX(" + dx + "px)" },
-        { transform: "translateX(0)" }
-      ],
-      { duration: 850, easing: "cubic-bezier(0.22, 1, 0.36, 1)", fill: "none" }
-    );
-  }
-  // Identity card (top-right) slides in from the right when it becomes visible
-  if (heroId && !heroId.hidden) {
-    heroId.animate(
-      [
-        { opacity: 0, transform: "translateX(20px)" },
-        { opacity: 1, transform: "translateX(0)" }
-      ],
-      { duration: 600, easing: "cubic-bezier(0.22, 1, 0.36, 1)", delay: 200, fill: "both" }
-    );
-  }
-}
-
+/* ---------------- Firebase ---------------- */
 function initFirebase() {
-  if (firebaseDb) return firebaseDb;
   try {
-    if (typeof firebase === "undefined") {
-      firebaseFailed = true;
-      setStatus("Firebase SDK missing — offline");
-      return null;
-    }
     firebase.initializeApp(FIREBASE_CONFIG);
-    firebaseDb = firebase.database();
-    // Real-time listener on the whole selections tree — pushed to us instantly on any change.
-    firebaseDb.ref("selections").on("value", (snapshot) => {
-      applyRemoteSelections(snapshot.val() || {}, "listener");
-    }, (err) => {
-      console.error("[HP] Firebase listener error:", err);
-      setStatus("offline (listener err)");
-    });
-    return firebaseDb;
+    db = firebase.database();
+    db.ref(".info/connected").on("value", s => setSync(s.val() ? "ok" : ""));
+    db.ref("selections").on("value", snap => {
+      const next = {};
+      for (const [id, v] of Object.entries(snap.val() || {})) if (EMP[id]) next[id] = new Set(toList(v));
+      const count = o => Object.values(o).reduce((n, s) => n + s.size, 0);
+      if (count(next) === 0 && count(state.sel) > 0) return;   // ignore an empty hiccup
+      if (DRY_RUN) for (const [id, s] of Object.entries(state.sel)) next[id] = s; // keep local tries
+      state.sel = next;
+      try { localStorage.setItem(CACHE_KEY, JSON.stringify(Object.fromEntries(Object.entries(next).map(([k, s]) => [k, [...s]])))); } catch (e) {}
+      renderSheet();
+    }, () => setSync("err"));
   } catch (e) {
-    console.error("[HP] Firebase init failed:", e);
-    firebaseFailed = true;
-    setStatus("offline (init err) — using local");
-    return null;
+    console.error(e);
+    setSync("err");
   }
 }
 
-// Apply remote selections into local state, with wipe protection guards.
-function applyRemoteSelections(remoteSel, source) {
-  if (!remoteSel || typeof remoteSel !== "object") remoteSel = {};
+function save(id, date, on) {
+  if (DRY_RUN) return;
+  if (!db) { toast("Offline — not saved"); return; }
+  db.ref("selections/" + id).transaction(cur => {
+    const s = new Set(toList(cur));
+    if (on) s.add(date); else s.delete(date);
+    return [...s].sort();
+  }).catch(() => {
+    const s = state.sel[id];
+    if (on) s.delete(date); else s.add(date);
+    renderSheet();
+    toast("Couldn't save — check your connection");
+  });
+}
 
-  // CRITICAL GUARD: if the server returned an EMPTY tree but we have non-empty
-  // local data or a non-empty snapshot on file, IGNORE the empty payload.
-  const remoteDays = countDays(remoteSel);
-  const localDays = countDays(serializeSelections());
-  const lastSnap = lastGoodSnapshot();
-  const snapshotDays = lastSnap ? countDays(lastSnap.selections) : 0;
-  if (remoteDays === 0 && (localDays > 0 || snapshotDays > 0)) {
-    setStatus("server returned empty — keeping local (guarded)");
-    console.warn("[HP] Refused empty server payload. local=" + localDays + " snap=" + snapshotDays + " source=" + source);
+function setSync(kind) {
+  const el = $("#sync");
+  el.className = "sync " + kind;
+  el.querySelector("span").textContent = DRY_RUN ? "Preview — not saving" : kind === "ok" ? "Live" : kind === "err" ? "Offline" : "Connecting";
+}
+
+/* ---------------- month nav ---------------- */
+function renderNav() {
+  const nav = $("#months");
+  if (!nav.children.length) {
+    nav.insertAdjacentHTML("beforeend", '<span class="slider" aria-hidden="true"></span>');
+    SEASON.forEach(([y, m], i) => {
+      const b = document.createElement("button");
+      b.innerHTML = MONTHS[m] + "<small>" + y + "</small>";
+      b.addEventListener("click", () => goMonth(i));
+      nav.appendChild(b);
+    });
+  }
+  const btns = nav.querySelectorAll("button");
+  btns.forEach((b, i) => b.setAttribute("aria-current", i === state.month ? "true" : "false"));
+  const a = btns[state.month], s = nav.querySelector(".slider");
+  s.style.width = a.offsetWidth + "px";
+  s.style.transform = "translateX(" + a.offsetLeft + "px)";
+}
+
+/* ---------------- the sheet ---------------- */
+function sheetHTML(i) {
+  const [Y, M] = SEASON[i];
+  const first = new Date(Y, M, 1);
+  const lead = dow(first);
+  const dim = new Date(Y, M + 1, 0).getDate();
+  const cells = Math.max(35, Math.ceil((lead + dim) / 7) * 7);
+  const today = todayIso();
+  let h = '<div class="s-head"><h2 class="s-title">' + MONTHS[M] + "<b>" + Y + '</b></h2><span class="s-note">Lightship Chartering Genova<br>Holiday planner</span></div>';
+  h += '<div class="wd">' + DAY3.map((d, k) => '<span class="' + (k >= 5 ? "sun" : "") + '">' + d + "</span>").join("") + "</div>";
+  h += '<div class="days">';
+  for (let k = 0; k < cells; k++) {
+    const t = new Date(Y, M, 1 - lead + k);
+    const date = iso(t.getFullYear(), t.getMonth(), t.getDate());
+    const w = dow(t), inM = t.getMonth() === M, hol = HOLIDAYS[date];
+    const cls = ["c", w === 5 && "sat", w === 6 && "sun", hol && inM && "hol", !inM && "out", date === today && "today"].filter(Boolean).join(" ");
+    const egg = inM ? EGG_DATES[date] || (date === today ? "today" : "") : "";
+    const eggAttr = egg ? ' data-egg="' + egg + '"' : "";
+    let inner = '<span class="n">' + t.getDate() + "</span>";
+    if (hol && inM) inner += '<span class="hn">' + hol + "</span>";
+    if (inM && !isFree(date)) {
+      const off = offOn(date);
+      if (off.length) {
+        const cap = innerWidth <= 760 ? 3 : 6;
+        const shown = off.length > cap ? off.slice(0, cap - 1) : off;
+        inner += '<span class="chips">' + shown.map(e =>
+          '<span class="chip' + (e.id === state.me ? " mine" : "") + (clashOf(date, e) ? " clash" : "") + (state.fresh === e.id + date ? " new" : "") + '" style="--c:' + e.color + '"><i></i>' + e.id + "</span>").join("") +
+          (off.length > shown.length ? '<span class="chip more">+' + (off.length - shown.length) + "</span>" : "") + "</span>";
+      }
+      const mine = state.me && has(state.me, date);
+      if (state.me && !mine) inner += '<span class="ghost" aria-hidden="true" style="--c:' + EMP[state.me].color + '">+ ' + state.me + "</span>";
+      const label = (mine ? "Cancel your day off on " : state.me ? "Book " : "") + longDate(date) + (off.length ? ". Off: " + off.map(e => e.id).join(", ") : ". Nobody off");
+      h += '<button class="' + cls + (mine ? " is-mine" : "") + '" data-date="' + date + '"' + eggAttr + ' aria-pressed="' + !!mine + '" aria-label="' + label + '">' + inner + "</button>";
+    } else {
+      h += '<div class="' + cls + '" data-date="' + date + '"' + eggAttr + ">" + inner + "</div>";
+    }
+  }
+  return h + "</div>";
+}
+
+function renderSheet() {
+  $("#sheet").innerHTML = sheetHTML(state.month);
+  state.fresh = null;
+  if (plane.el) planeCheck();
+}
+
+/* ---------------- tearing a page off ----------------
+   Like a real tear-off pad: you pinch the sheet, its bottom-right lifts
+   toward you, the perforation gives way from right to left, and the
+   loose page drops, fluttering, off the bottom of the screen. A ragged
+   stub stays under the glue.                                            */
+function raggedEdge(width, base, step) {
+  const pts = [];
+  let y = base;
+  for (let x = 0; x <= width + step; x += step) {
+    y = base + Math.max(-3.5, Math.min(4, (y - base) * .45 + rand(-2.6, 2.6)));
+    pts.push([Math.min(x, width), y]);
+  }
+  return pts;
+}
+
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const smooth = (a, b, t) => { const x = clamp((t - a) / (b - a), 0, 1); return x * x * x * (x * (x * 6 - 15) + 10); };   // smootherstep
+
+function tearStrips(i) {
+  state.tearing = true;
+  const sheet = $("#sheet");
+  const r = sheet.getBoundingClientRect();
+  const W = r.width, H = r.height, TEAR_Y = 9;
+  const edge = raggedEdge(W, TEAR_Y, rand(4, 6.5));
+  const N = clamp(Math.round(W / 46), 9, 18);
+  const sw = W / N;
+
+  const layer = $("#tear-layer");
+  layer.style.perspective = "1500px";
+  layer.style.perspectiveOrigin = (r.left + W / 2) + "px " + (r.top + H * .3) + "px";
+
+  const leaf = document.createElement("div");
+  leaf.className = "leaf";
+  leaf.style.cssText = "left:" + r.left + "px;top:" + r.top + "px;width:" + W + "px;height:" + H + "px";
+
+  // the page is cut into vertical strips so it can bend like paper
+  const strips = [];
+  for (let k = 0; k < N; k++) {
+    const s = document.createElement("div");
+    s.className = "strip";
+    const x0 = k * sw, w = sw + 2.5;
+    s.style.cssText = "left:" + x0 + "px;width:" + w + "px;height:" + H + "px";
+    const copy = sheet.cloneNode(true);
+    copy.removeAttribute("id");
+    copy.style.cssText = "position:absolute;left:" + (-x0) + "px;top:0;width:" + W + "px;margin:0";
+    s.appendChild(copy);
+    const pts = edge.filter(([x]) => x >= x0 - 7 && x <= x0 + w + 7).map(([x, y]) => (x - x0).toFixed(1) + "px " + y.toFixed(1) + "px");
+    s.style.clipPath = "polygon(" + pts.join(",") + "," + w + "px " + H + "px,0 " + H + "px)";
+    const sh = document.createElement("div");
+    sh.className = "sh";
+    s.appendChild(sh);
+    leaf.appendChild(s);
+    strips.push({ el: s, sh, u: (k + .5) / N });
+  }
+
+  // the ragged stub that stays under the glue
+  document.querySelector(".stub")?.remove();
+  const stub = document.createElement("div");
+  stub.className = "stub";
+  stub.style.clipPath = "polygon(0 0, 100% 0, " + edge.slice().reverse().map(([x, y]) => (x / W * 100).toFixed(2) + "% " + y.toFixed(1) + "px").join(",") + ")";
+  stub.style.height = (TEAR_Y + 6) + "px";
+  stub.style.opacity = "0";
+
+  // cover the old page first, then put the new month underneath
+  layer.appendChild(leaf);
+  state.month = i;
+  renderSheet();
+  renderNav();
+  const under = document.createElement("div");
+  under.className = "under-shade";
+  under.style.opacity = "0";
+  $(".sheets").append(under, stub);
+
+  // One continuous gesture. Every curve is a smootherstep, so nothing starts
+  // or stops with a jolt, and the fall begins with the speed of the pull.
+  const D = 1050;
+  const fall = innerHeight - r.top + 180;
+  const drift = Math.random() < .5 ? -1 : 1;
+  let lastFibre = 1.1, t0 = null;
+
+  function frame(now) {
+    if (t0 === null) t0 = now;                                  // start timing after the first paint
+    const p = clamp((now - t0) / D, 0, 1);
+    const grab = smooth(0, .2, p);                              // fingers pinch the bottom-right corner
+    const front = 1.06 - 1.18 * smooth(.06, .4, p);             // the perforation gives way, right to left
+    const loose = smooth(.3, .6, p);                            // fully detached
+    const f = clamp((p - .3) / .7, 0, 1);                       // falling time
+
+    for (const s of strips) {
+      const u = s.u;
+      const freed = smooth(0, .35, u - front);
+      let rx = grab * (2 + 12 * u * u * u) + freed * 13 * (.45 + .55 * u);
+      let ty = grab * 2.5 * u + freed * 12;
+      rx += (10 + 7 * u - rx) * loose;                         // relax into one gentle curve
+      ty += (11 - ty) * loose;
+      s.el.style.transform = "translate3d(0," + ty.toFixed(2) + "px,0) rotateX(" + rx.toFixed(2) + "deg)";
+      s.sh.style.opacity = clamp(rx / 36, 0, .85).toFixed(3);
+    }
+
+    if (front < lastFibre - .08 && front > -.04) {
+      lastFibre = front;
+      fibre(r.left + clamp(front, 0, 1) * W + rand(-5, 5), r.top + TEAR_Y + rand(-2, 2));
+    }
+    stub.style.opacity = smooth(1.06, .9, front).toFixed(2);
+
+    // gravity with a running start, flutter that fades in, a little drift
+    const amp = smooth(0, .25, f);
+    const y = fall * (f * f * .82 + f * .18);
+    const x = drift * (Math.sin(f * Math.PI * 1.5) * 24 + f * 40) * amp;
+    const rz = drift * (Math.sin(f * Math.PI * 2) * 4 + f * 10) * amp;
+    const rxF = Math.sin(f * Math.PI * 3) * 15 * amp;
+    const ry = Math.sin(f * Math.PI * 2.4) * 11 * amp;
+    leaf.style.transform = "translate3d(" + x.toFixed(1) + "px," + y.toFixed(1) + "px,0) rotateZ(" + rz.toFixed(2) + "deg) rotateX(" + rxF.toFixed(2) + "deg) rotateY(" + ry.toFixed(2) + "deg)";
+    under.style.opacity = ((.32 * grab) * (1 - smooth(.35, .75, p))).toFixed(3);
+
+    if (p < 1) requestAnimationFrame(frame);
+    else {
+      leaf.remove(); under.remove();
+      state.tearing = false;
+      if (state.queued !== null) { const q = state.queued; state.queued = null; goMonth(q); }
+    }
+  }
+  requestAnimationFrame(() => requestAnimationFrame(frame));    // let the copies paint once before moving
+  setTimeout(() => planeHop(), D * .3);
+}
+
+function goMonth(i) {
+  if (i === state.month || i < 0 || i >= SEASON.length) return;
+  if (state.tearing) { state.queued = i; return; }
+  tearRhythm();
+  if (REDUCED) {
+    state.month = i; renderSheet(); renderNav();
+    $("#sheet").animate([{ opacity: 0 }, { opacity: 1 }], { duration: 220 });
     return;
   }
+  tearStrips(i);
+}
 
-  // Merge remote into state. Never overwrite OUR row if we have unsaved local edits.
-  let mergedMine = false;
-  for (const [empId, dates] of Object.entries(remoteSel)) {
-    if (!EMP_BY_ID[empId]) continue;
-    if (empId === state.me && hasPendingChanges()) continue;
-    state.selections[empId] = new Set(Array.isArray(dates) ? dates : []);
-    if (empId === state.me) mergedMine = true;
+function fibre(x, y) {
+  const b = document.createElement("span");
+  b.className = "bit fibre";
+  b.style.left = x + "px"; b.style.top = y + "px";
+  b.style.width = rand(2, 5) + "px"; b.style.height = rand(1, 2) + "px";
+  document.body.appendChild(b);
+  const dx = rand(-14, 14), dy = rand(40, 90);
+  b.animate([
+    { transform: "translate(0,0) rotate(0)", opacity: 1 },
+    { transform: "translate(" + dx + "px," + dy + "px) rotate(" + rand(-200, 200) + "deg)", opacity: 0 }
+  ], { duration: rand(700, 1100), easing: "cubic-bezier(.3,0,.7,1)" }).onfinish = () => b.remove();
+}
+
+/* ---------------- who are you ----------------
+   The first thing the page asks. Your choice is remembered on this
+   device; changing it needs the office password, so nobody books days
+   for the wrong person by mistake. (A friendly lock, not real security:
+   anyone who reads the source can find it.)                            */
+const ME_KEY = "lightship-winter-2627-me";
+const SWITCH_PASSWORD = "Lightship1";
+
+function loadMe() {
+  try { const id = localStorage.getItem(ME_KEY); if (EMP[id]) state.me = id; } catch (e) {}
+}
+
+function renderMe() {
+  const el = $("#me");
+  if (!state.me) { el.hidden = true; return; }
+  const e = EMP[state.me];
+  el.hidden = false;
+  el.innerHTML = '<span class="me-tag" style="--c:' + e.color + '"><i></i>' + e.id + '</span><button class="me-switch" type="button">Not you?</button>';
+}
+
+let whoTimer = null;
+function openWho(step) {
+  clearTimeout(whoTimer);
+  $("#who").classList.remove("leaving");
+  state.who = step;                       // "pick" | "password"
+  state.whoPick = null;
+  const w = $("#who");
+  const canCancel = !!state.me;
+  const card = step === "password"
+    ? '<form class="who-card" id="who-form" autocomplete="off">' +
+        '<h2 id="who-title">Switch person</h2>' +
+        '<p class="who-sub">You are booking as <b>' + state.me + '</b>. Enter the office password to change.</p>' +
+        '<label class="who-field"><span>Password</span><input id="who-pw" type="password" autocomplete="off" spellcheck="false" required></label>' +
+        '<p class="who-err" id="who-err" aria-live="polite"></p>' +
+        '<div class="who-actions"><button type="button" class="who-ghost" data-act="cancel">Cancel</button><button type="submit" class="who-go">Continue</button></div>' +
+      "</form>"
+    : '<div class="who-card">' +
+        '<h2 id="who-title">Who are you?</h2>' +
+        '<p class="who-sub">Pick your initials. Your days off will be saved under this name.</p>' +
+        DEPARTMENTS.map(d => '<div class="who-group"><h3>' + d.name + '</h3><div class="who-row">' +
+          d.members.map(id => '<button type="button" class="who-pick" data-id="' + id + '" style="--c:' + EMP[id].color + '" aria-pressed="false"><i></i>' + id + "</button>").join("") +
+          "</div></div>").join("") +
+        '<div class="who-actions">' + (canCancel ? '<button type="button" class="who-ghost" data-act="cancel">Cancel</button>' : "<span></span>") +
+          '<button type="button" class="who-go" data-act="confirm" disabled>Choose your initials</button></div>' +
+      "</div>";
+  w.innerHTML = card;
+  w.hidden = false;
+  document.body.classList.add("who-open");
+  requestAnimationFrame(() => (w.querySelector("#who-pw") || w.querySelector(".who-pick"))?.focus({ preventScroll: true }));
+}
+
+function closeWho() {
+  const w = $("#who");
+  state.who = null;
+  document.body.classList.remove("who-open");
+  if (REDUCED) { w.hidden = true; return; }
+  w.classList.add("leaving");
+  whoTimer = setTimeout(() => { w.hidden = true; w.classList.remove("leaving"); }, 260);
+}
+
+function onWhoClick(e) {
+  const pick = e.target.closest(".who-pick");
+  if (pick) {
+    state.whoPick = pick.dataset.id;
+    $("#who").querySelectorAll(".who-pick").forEach(b => b.setAttribute("aria-pressed", b === pick));
+    const go = $("#who").querySelector(".who-go");
+    go.disabled = false;
+    go.textContent = "I'm " + state.whoPick;
+    go.style.setProperty("--c", EMP[state.whoPick].color);
+    return;
   }
-  // Also drop any local employees whose entries no longer exist remotely — but ONLY
-  // when the remote had at least one entry (so a temporary blip doesn't clear us).
-  if (remoteDays > 0) {
-    for (const empId of Object.keys(state.selections)) {
-      if (!(empId in remoteSel) && empId !== state.me) {
-        // keep the local value — safer than deleting.
-      }
+  const act = e.target.closest("[data-act]")?.dataset.act;
+  if (act === "cancel") closeWho();
+  if (act === "confirm" && state.whoPick) {
+    state.me = state.whoPick;
+    try { localStorage.setItem(ME_KEY, state.me); } catch (e) {}
+    closeWho();
+    renderMe();
+    renderSheet();
+    toast("Hi " + state.me + " — click any working day to book it.");
+  }
+}
+
+function onWhoSubmit(e) {
+  e.preventDefault();
+  const input = $("#who-pw");
+  if (input.value === SWITCH_PASSWORD) { openWho("pick"); return; }
+  $("#who-err").textContent = "That's not the password.";
+  input.select();
+  const card = $("#who .who-card");
+  card.classList.remove("shake"); void card.offsetWidth; card.classList.add("shake");
+}
+
+/* ---------------- booking your own day ---------------- */
+function toggleMine(date) {
+  if (!state.me) { openWho("pick"); return; }
+  const id = state.me;
+  const s = state.sel[id] || (state.sel[id] = new Set());
+  const on = !s.has(date);
+  if (on) s.add(date); else s.delete(date);
+  state.fresh = on ? id + date : null;
+  renderSheet();
+  save(id, date, on);
+  const others = offOn(date).filter(e => e.id !== id && e.dept === EMP[id].dept).map(e => e.id);
+  toast(on ? (others.length ? "Booked " + shortDate(date) + " — " + others.join(", ") + " from your team is off too" : "Booked " + shortDate(date) + " off") : "Removed " + shortDate(date));
+  if (on) afterBooking(id, date);
+}
+
+/* ---------------- the plane ----------------
+   It rests on an empty square (never on anyone's name). The pointer pushes
+   it softly, like the snow used to: it slides ahead of the cursor, gets
+   carried along the way you move, turns its nose where it is going, and
+   can never be touched. Leave it alone and it glides to the nearest free
+   square. It never leaves the calendar.                                  */
+const plane = { x: 0, y: 0, vx: 0, vy: 0, heading: rand(-40, 40), hv: 0, bank: 0, lift: 0, roll: null, target: null, calmSince: 0, last: 0 };
+const pointer = { x: -9999, y: -9999, vx: 0, vy: 0, t: 0, active: false };
+let planeRunning = false;
+
+function initPlane() {
+  plane.el = $(".prop");
+  plane.rots = plane.el.querySelectorAll(".rot");
+  plane.shadow = plane.el.querySelector(".shadow");
+  const pad = $("#pad");
+  const move = e => {
+    const r = pad.getBoundingClientRect();
+    const x = e.clientX - r.left, y = e.clientY - r.top, now = performance.now();
+    if (pointer.active && pointer.t) {
+      const dt = clamp((now - pointer.t) / 16.667, .5, 4);
+      pointer.vx = pointer.vx * .55 + (x - pointer.x) / dt * .45;
+      pointer.vy = pointer.vy * .55 + (y - pointer.y) / dt * .45;
     }
-  }
-  if (mergedMine || !state.me) setSavedMine();
-  // Persist a fresh local backup so reloads survive offline
-  try { localStorage.setItem(BACKUP_KEY, JSON.stringify(serializeSelections())); } catch(e){}
-  // Persistent snapshot ring (only non-empty states)
-  pushSnapshot(serializeSelections(), source);
-  firebaseReady = true;
-  renderActiveMonth();
-  renderMiniMonths();
-  renderSummary();
-  renderFilterList();
-  renderPendingBar();
-  setStatus("synced " + new Date().toLocaleTimeString());
+    pointer.x = x; pointer.y = y; pointer.t = now; pointer.active = true;
+    wakePlane();
+  };
+  pad.addEventListener("pointermove", move);
+  pad.addEventListener("pointerdown", move);
+  pad.addEventListener("pointerleave", () => { pointer.active = false; pointer.vx = pointer.vy = 0; wakePlane(); });
+  requestAnimationFrame(() => {
+    const s = parkingSpots().sort((a, b) => b.weight - a.weight);
+    const best = s.filter(x => x.weight === (s[0] && s[0].weight));
+    const start = best.length ? best[Math.floor(Math.random() * best.length)] : { x: 200, y: 200 };
+    plane.x = start.x; plane.y = start.y; plane.target = start;
+    paintPlane();
+    plane.el.classList.add("ready");
+  });
 }
 
-// Legacy name — used by init and visibility handler as a manual "pull now" trigger.
-async function pullFromBin() {
-  if (!firebaseDb) initFirebase();
-  if (!firebaseDb) return;
-  try {
-    const snap = await firebaseDb.ref("selections").once("value");
-    applyRemoteSelections(snap.val() || {}, "pull");
-  } catch (e) {
-    setStatus("offline (pull err) — using local");
-  }
-}
-
-async function pushToBin() {
-  // Serialize: if a save is already running, mark that another is needed and bail
-  if (pushInProgress) { pushPendingAgain = true; return; }
-  pushInProgress = true;
-  setStatus("saving…");
-  try {
-    if (!state.me) {
-      // No identity picked yet — save prefs only, do NOT touch remote.
-      setStatus("save skipped (no identity)");
-      return;
-    }
-    if (!firebaseDb) initFirebase();
-    if (!firebaseDb) {
-      setStatus("offline — will retry");
-      return;
-    }
-    const mine = Array.from(state.selections[state.me] || new Set()).sort();
-    // Firebase atomic set on OUR node only — cannot possibly affect other employees' rows.
-    await firebaseDb.ref("selections/" + state.me).set(mine);
-    state.savedMineDates = mine;
-    try { localStorage.setItem(BACKUP_KEY, JSON.stringify(serializeSelections())); } catch(e){}
-    pushSnapshot(serializeSelections(), "push");
-    setStatus("saved " + new Date().toLocaleTimeString());
-  } catch (e) {
-    console.error("[HP] push error:", e);
-    setStatus("save failed (" + (e && e.code ? e.code : "network") + ")");
-  } finally {
-    pushInProgress = false;
-    if (pushPendingAgain) {
-      pushPendingAgain = false;
-      pushToBin();
-    }
-  }
-}
-
-// Save now — no debounce
-function schedulePush() { pushToBin(); }
-
-/* ============================================================
-   Snapshot ring — persistent, tamper-resistant local backup.
-   These snapshots survive wipes, pulls, and 403s. Never cleared
-   automatically. Used as last-resort recovery source.
-   ============================================================ */
-function getSnapshots() {
-  try {
-    const raw = localStorage.getItem(SNAPSHOTS_KEY);
-    if (!raw) return [];
-    const arr = JSON.parse(raw);
-    return Array.isArray(arr) ? arr : [];
-  } catch (e) { return []; }
-}
-function countDays(selections) {
-  let n = 0;
-  for (const v of Object.values(selections || {})) {
-    n += Array.isArray(v) ? v.length : (v && v.size) || 0;
-  }
-  return n;
-}
-function pushSnapshot(selections, reason) {
-  // Only snapshot NON-EMPTY states. An empty snapshot is worthless.
-  if (!selections || countDays(selections) === 0) return;
-  const snaps = getSnapshots();
-  const now = Date.now();
-  // Rate-limit: skip if we already snapped in the last SNAPSHOT_MIN_GAP_MS
-  if (snaps.length && (now - snaps[0].ts) < SNAPSHOT_MIN_GAP_MS) return;
-  // Skip if identical to the most recent one
-  const serialized = JSON.stringify(selections);
-  if (snaps.length && JSON.stringify(snaps[0].selections) === serialized) return;
-  snaps.unshift({ ts: now, iso: new Date(now).toISOString(), reason: reason || "auto", selections });
-  const trimmed = snaps.slice(0, SNAPSHOT_KEEP);
-  try { localStorage.setItem(SNAPSHOTS_KEY, JSON.stringify(trimmed)); } catch(e){}
-}
-function lastGoodSnapshot() {
-  const snaps = getSnapshots();
-  for (const snap of snaps) if (countDays(snap.selections) > 0) return snap;
-  return null;
-}
-// Expose to console for emergency recovery
-window.lhp = window.lhp || {};
-window.lhp.snapshots = getSnapshots;
-window.lhp.lastGood = lastGoodSnapshot;
-window.lhp.exportSnapshot = function(index) {
-  const snap = getSnapshots()[index || 0];
-  if (!snap) { console.log("no snapshot at index", index); return; }
-  const payload = { app:"lightship-holiday-planner", version:3, year:2026, exportedBy:"snapshot-recovery", exportedAt:snap.iso, selections:snap.selections };
-  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url; a.download = "recovery-" + snap.iso.replace(/[:.]/g,"-") + ".json";
-  document.body.appendChild(a); a.click(); a.remove();
-  URL.revokeObjectURL(url);
-  return "downloaded snapshot from " + snap.iso;
-};
-
-const state = {
-  me: null,
-  activeMonth: MONTHS[0],
-  selections: {},
-  visible: new Set(EMPLOYEES.map(e => e.id)),
-  savedMineDates: [],   // last confirmed dates for "me"
-};
-
-// Helpers for pending-changes flow
-function snapshotMine() {
-  if (!state.me) return [];
-  return Array.from(state.selections[state.me] || new Set()).sort();
-}
-function setSavedMine() { state.savedMineDates = snapshotMine(); }
-function hasPendingChanges() {
-  return JSON.stringify(snapshotMine()) !== JSON.stringify(state.savedMineDates.slice().sort());
-}
-function discardPending() {
-  if (!state.me) return;
-  state.selections[state.me] = new Set(state.savedMineDates);
-  renderActiveMonth();
-  renderSummary();
-  renderPendingBar();
-  showToast("Changes discarded");
-}
-
-/* ============================================================
-   Persistence
-   ============================================================ */
-function loadState() {
-  if (location.hash.startsWith("#data=")) {
-    try {
-      const json = atob(decodeURIComponent(location.hash.slice(6)));
-      const obj = JSON.parse(json);
-      if (obj && obj.selections) {
-        const raw = localStorage.getItem(STORAGE_KEY);
-        if (raw) {
-          const local = JSON.parse(raw);
-          if (local.me && EMP_BY_ID[local.me]) state.me = local.me;
-          if (local.selections) applySerializedSelections(local.selections);
-          if (Array.isArray(local.visible)) state.visible = new Set(local.visible.filter(x => EMP_BY_ID[x]));
-          if (typeof local.activeMonth === "number" && MONTHS.includes(local.activeMonth)) state.activeMonth = local.activeMonth;
-        }
-        const empIds = Object.keys(obj.selections).filter(id => EMP_BY_ID[id]);
-        if (empIds.length && confirm("Import holidays for: " + empIds.join(", ") + "?\nThis replaces any existing entries for them.")) {
-          for (const empId of empIds) state.selections[empId] = new Set(obj.selections[empId]);
-          saveState();
-          showToast("Imported " + empIds.join(", "));
-        }
-        history.replaceState(null, "", location.pathname + location.search);
-        return;
-      }
-    } catch (e) { console.warn("Bad share link", e); }
-  }
-
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) {
-      const obj = JSON.parse(raw);
-      if (obj && obj.me && EMP_BY_ID[obj.me]) state.me = obj.me;
-      if (obj && Array.isArray(obj.visible)) state.visible = new Set(obj.visible.filter(id => EMP_BY_ID[id]));
-      if (obj && typeof obj.activeMonth === "number" && MONTHS.includes(obj.activeMonth)) state.activeMonth = obj.activeMonth;
-    }
-    // Full data backup — restore selections so the screen isn't blank if pull fails
-    const backup = localStorage.getItem(BACKUP_KEY);
-    if (backup) {
-      const sel = JSON.parse(backup);
-      applySerializedSelections(sel);
-    }
-    // Fallback: if regular backup is empty (or missing), pull from the snapshot ring
-    if (countDays(serializeSelections()) === 0) {
-      const snap = lastGoodSnapshot();
-      if (snap) {
-        console.warn("[HP] Regular backup empty — restoring from snapshot", snap.iso);
-        applySerializedSelections(snap.selections);
-      }
-    }
-  } catch (e) { console.warn("Could not load state", e); }
-}
-
-function applySerializedSelections(serialized) {
-  state.selections = {};
-  for (const [empId, dates] of Object.entries(serialized)) {
-    if (!EMP_BY_ID[empId]) continue;
-    state.selections[empId] = new Set(dates);
-  }
-}
-function serializeSelections() {
-  const out = {};
-  for (const [empId, set] of Object.entries(state.selections)) {
-    out[empId] = Array.from(set).sort();
-  }
+// empty squares: weekends, days from other months, days nobody booked
+function parkingSpots() {
+  const pad = $("#pad").getBoundingClientRect();
+  const out = [];
+  document.querySelectorAll("#sheet .c").forEach(c => {
+    if (c.querySelector(".chips")) return;
+    const r = c.getBoundingClientRect();
+    const weight = c.querySelector(".hn") ? .3 : c.classList.contains("out") || c.classList.contains("sat") || c.classList.contains("sun") ? 3 : 1;
+    out.push({ x: r.left - pad.left + r.width * .6, y: r.top - pad.top + r.height * .6, weight, date: c.dataset.date });
+  });
   return out;
 }
-function saveState() {
-  // Personal preferences
-  const local = {
-    me: state.me, activeMonth: state.activeMonth,
-    visible: Array.from(state.visible),
-  };
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(local));
-    // Full data backup (used if remote pull fails or before first sync)
-    localStorage.setItem(BACKUP_KEY, JSON.stringify(serializeSelections()));
-  } catch (e) { /* ignore */ }
-  // Auto-save to shared backend (debounced ~250ms)
-  schedulePush();
+
+const planeSize = () => plane.el.offsetWidth;
+const pushRadius = () => planeSize() * 1.25 + 70;
+
+function planeBounds() {
+  const pad = $("#pad").getBoundingClientRect(), d = $("#sheet .days").getBoundingClientRect();
+  const m = planeSize() * .5;
+  return { x0: d.left - pad.left + m, x1: d.right - pad.left - m, y0: d.top - pad.top + m, y1: d.bottom - pad.top - m };
 }
 
-/* ============================================================
-   Date helpers
-   ============================================================ */
-function isoDate(y, m0, d) { return y + "-" + String(m0+1).padStart(2,"0") + "-" + String(d).padStart(2,"0"); }
-function daysInMonth(y, m0) { return new Date(y, m0+1, 0).getDate(); }
-function weekdayMon0(y, m0, d) { return (new Date(y, m0, d).getDay() + 6) % 7; }
-function todayIso() { const d=new Date(); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); }
-function ensureSet(empId) { if (!state.selections[empId]) state.selections[empId] = new Set(); return state.selections[empId]; }
-function toggleDay(empId, dateStr) {
-  const set = ensureSet(empId);
-  if (set.has(dateStr)) set.delete(dateStr); else set.add(dateStr);
-  saveState();
+// nearest free square that isn't under the pointer
+function chooseSpot(avoid, randomish) {
+  const spots = parkingSpots();
+  if (!spots.length) return null;
+  const R = pushRadius() * 1.15;
+  let pool = spots.filter(s => !avoid || Math.hypot(s.x - avoid.x, s.y - avoid.y) > R);
+  if (!pool.length) pool = spots;
+  pool.sort((a, b) => Math.hypot(a.x - plane.x, a.y - plane.y) / a.weight - Math.hypot(b.x - plane.x, b.y - plane.y) / b.weight);
+  return pool[randomish ? Math.floor(Math.random() * Math.min(3, pool.length)) : 0];
 }
 
-/* ============================================================
-   Identity bar
-   ============================================================ */
-function renderIdentityBar() {
-  const container = document.getElementById("dept-list");
-  const heroSlot  = document.getElementById("hero-identity");
-  const identityBar = document.querySelector(".identity-bar");
-  container.innerHTML = "";
-  if (heroSlot) heroSlot.innerHTML = "";
+function wakePlane() {
+  if (planeRunning || REDUCED || !plane.target && !plane.el?.classList.contains("ready")) return;
+  planeRunning = true;
+  plane.last = performance.now();
+  requestAnimationFrame(stepPlane);
+}
 
-  if (!state.me) {
-    // No identity yet — show only the picker (rest of the page is hidden via body class)
-    document.body.classList.add("no-identity");
-    if (heroSlot) heroSlot.hidden = true;
-    if (identityBar) identityBar.hidden = false;
+function stepPlane(now) {
+  const dt = clamp((now - plane.last) / 16.667, .25, 2.5);
+  plane.last = now;
+  const b = planeBounds();
+  const R = pushRadius();
+  const dx = plane.x - pointer.x, dy = plane.y - pointer.y;
+  const d = Math.hypot(dx, dy) || .001;
+  const ux = dx / d, uy = dy / d;
+  let ax = 0, ay = 0;
+  const near = pointer.active && d < R;
 
-    const wrap = document.createElement("div");
-    wrap.className = "pick-identity";
+  if (near) {
+    const s = 1 - d / R;
+    // a soft field that gets firm close in, exactly like the snowflakes
+    const f = s * s * 1.6 + Math.pow(s, 4) * 9;
+    ax += ux * f; ay += uy * f;
+    // and it is carried along by the way the cursor moves
+    ax += pointer.vx * s * .22; ay += pointer.vy * s * .22;
+    plane.target = null;
+    plane.calmSince = now;
+  } else if (!plane.target && now - plane.calmSince > 260) {
+    plane.target = chooseSpot(pointer.active ? pointer : null);
+  }
 
-    const prompt = document.createElement("p");
-    prompt.className = "pick-prompt";
-    prompt.textContent = "Select who you are";
-    wrap.appendChild(prompt);
+  if (plane.target) {
+    // glide home on a damped spring
+    ax += (plane.target.x - plane.x) * .010;
+    ay += (plane.target.y - plane.y) * .010;
+  }
 
-    for (const dept of DEPARTMENTS) {
-      const row = document.createElement("div");
-      row.className = "pick-row";
-      const lbl = document.createElement("div");
-      lbl.className = "pick-dept-label";
-      lbl.textContent = dept.name;
-      row.appendChild(lbl);
+  // soft walls: the edge of the calendar pushes back before the hard stop
+  const wall = 26;
+  if (plane.x < b.x0 + wall) ax += (b.x0 + wall - plane.x) * .05;
+  if (plane.x > b.x1 - wall) ax -= (plane.x - (b.x1 - wall)) * .05;
+  if (plane.y < b.y0 + wall) ay += (b.y0 + wall - plane.y) * .05;
+  if (plane.y > b.y1 - wall) ay -= (plane.y - (b.y1 - wall)) * .05;
 
-      for (const memberId of dept.members) {
-        const emp = EMP_BY_ID[memberId];
-        const chip = document.createElement("button");
-        chip.className = "emp-chip";
-        chip.innerHTML = '<span class="swatch" style="background:' + emp.color + '"></span>' + emp.id;
-        chip.addEventListener("click", () => {
-          transitionBrandPosition(() => {
-            state.me = emp.id;
-            state.visible.add(emp.id);
-            saveState();
-            renderAll();
-            showToast("Welcome, " + emp.id);
-          });
-        });
-        row.appendChild(chip);
+  const damp = Math.pow(plane.target && !near ? .86 : .9, dt);
+  plane.vx = (plane.vx + ax * dt) * damp;
+  plane.vy = (plane.vy + ay * dt) * damp;
+  const sp = Math.hypot(plane.vx, plane.vy);
+  if (sp > 16) { plane.vx *= 16 / sp; plane.vy *= 16 / sp; }
+  plane.x += plane.vx * dt;
+  plane.y += plane.vy * dt;
+
+  // hard stop at the edges: slide along them instead of leaving
+  if (plane.x < b.x0) { plane.x = b.x0; plane.vx = Math.abs(plane.vx) * .2; }
+  if (plane.x > b.x1) { plane.x = b.x1; plane.vx = -Math.abs(plane.vx) * .2; }
+  if (plane.y < b.y0) { plane.y = b.y0; plane.vy = Math.abs(plane.vy) * .2; }
+  if (plane.y > b.y1) { plane.y = b.y1; plane.vy = -Math.abs(plane.vy) * .2; }
+
+  // last resort, cornered: ease out of reach along the free side
+  if (pointer.active) {
+    const min = planeSize() * .6 + 20;
+    const d2 = Math.hypot(plane.x - pointer.x, plane.y - pointer.y);
+    if (d2 < min) {
+      let best = null, bestD = Infinity;
+      for (let k = 0; k < 36; k++) {
+        const a = k / 36 * Math.PI * 2, x = pointer.x + Math.cos(a) * min, y = pointer.y + Math.sin(a) * min;
+        if (x < b.x0 || x > b.x1 || y < b.y0 || y > b.y1) continue;
+        const dd = Math.hypot(x - plane.x, y - plane.y);
+        if (dd < bestD) { bestD = dd; best = { x, y }; }
       }
-      wrap.appendChild(row);
+      if (best) { plane.x += (best.x - plane.x) * .65; plane.y += (best.y - plane.y) * .65; }
     }
-    container.appendChild(wrap);
+  }
+
+  // nose follows the direction of travel, through a damped turn
+  const speed = Math.hypot(plane.vx, plane.vy);
+  if (speed > .35) {
+    const want = Math.atan2(plane.vx, -plane.vy) * 180 / Math.PI;
+    const diff = ((want - plane.heading + 540) % 360) - 180;
+    plane.hv = plane.hv * Math.pow(.7, dt) + diff * .06 * Math.min(1, speed / 2) * dt;
+  } else plane.hv *= Math.pow(.7, dt);
+  plane.heading += plane.hv * dt;
+  plane.bank += (clamp(plane.hv * .045, -.35, .35) - plane.bank) * .2 * dt;
+  plane.lift += (clamp(speed / 5, 0, 1) - plane.lift) * .12 * dt;
+
+  paintPlane();
+  const parked = plane.target && Math.hypot(plane.target.x - plane.x, plane.target.y - plane.y) < .5 && speed < .04;
+  const busy = !parked || near || plane.lift > .01 || Math.abs(plane.hv) > .02 || plane.roll;
+  if (busy) requestAnimationFrame(stepPlane); else planeRunning = false;
+}
+
+function paintPlane() {
+  const w = planeSize();
+  let sx = 1 - Math.abs(plane.bank) * .35;
+  if (plane.roll) {
+    const p = (performance.now() - plane.roll) / 900;
+    if (p >= 1) plane.roll = null; else sx = Math.cos(p * Math.PI * 2);
+  }
+  plane.el.style.transform = "translate3d(" + (plane.x - w / 2).toFixed(2) + "px," + (plane.y - w / 2).toFixed(2) + "px,0) scale(" + (1 + plane.lift * .14).toFixed(3) + ")";
+  const rot = "rotate(" + plane.heading.toFixed(2) + "deg) scaleX(" + sx.toFixed(3) + ")";
+  plane.rots.forEach(r => r.style.transform = rot);
+  plane.shadow.style.transform = "translate3d(" + (4 + plane.lift * 22).toFixed(1) + "px," + (6 + plane.lift * 30).toFixed(1) + "px,0)";
+  plane.shadow.style.filter = "blur(" + (3 + plane.lift * 8).toFixed(1) + "px)";
+  plane.shadow.style.opacity = (.32 - plane.lift * .14).toFixed(3);
+}
+
+// after the calendar changes, make sure the plane isn't parked on a name
+function planeCheck() {
+  requestAnimationFrame(() => {
+    if (!plane.target) return;
+    const ok = parkingSpots().find(s => s.date === plane.target.date);
+    plane.target = ok || chooseSpot(pointer.active ? pointer : null);
+    wakePlane();
+  });
+}
+function planeHop() {
+  if (REDUCED || !plane.el) return;
+  plane.target = chooseSpot(pointer.active ? pointer : { x: plane.x, y: plane.y }, true);
+  plane.vy -= 2.5;
+  wakePlane();
+}
+function planeRoll() {
+  if (REDUCED || !plane.el) return;
+  plane.roll = performance.now();
+  planeHop();
+}
+
+/* ---------------- easter eggs ---------------- */
+const EGG_DATES = {
+  "2026-12-24": "eve", "2026-12-25": "xmas", "2026-12-31": "nye", "2027-01-01": "newyear",
+  "2027-02-09": "carnival", "2027-02-14": "valentine", "2026-12-21": "solstice"
+};
+
+// 2. Hover special days.
+const eggCooldown = new Map();
+function onEggHover(e) {
+  const c = e.target.closest("[data-egg]");
+  if (!c || REDUCED) return;
+  const k = c.dataset.date, now = Date.now();
+  if (now - (eggCooldown.get(k) || 0) < 4000) return;
+  eggCooldown.set(k, now);
+  const r = c.getBoundingClientRect(), x = r.left + r.width / 2, y = r.top + r.height / 2;
+  ({
+    eve:      () => burst(x, y, 14, ["#f2a93b", "#ffffff", "#e0313f"], "star", 60),
+    xmas:     () => { burst(x, y, 18, ["#e0313f", "#2f9e6e", "#f2c14e"], "star", 80); },
+    nye:      () => fireworks(x, y, 1),
+    newyear:  () => fireworks(x, y, 3),
+    carnival: () => confetti(x, r.top, 60),
+    valentine:() => hearts(x, y),
+    solstice: () => toast("Shortest day of the year. It only gets brighter from here."),
+    today:    () => ping(r)
+  })[c.dataset.egg]?.();
+}
+
+function bit(x, y, html, css) {
+  const b = document.createElement("span");
+  b.className = "bit";
+  b.style.left = x + "px"; b.style.top = y + "px";
+  if (css) Object.assign(b.style, css);
+  b.innerHTML = html || "";
+  document.body.appendChild(b);
+  return b;
+}
+const STAR = c => '<svg width="12" height="12" viewBox="0 0 12 12"><path d="M6 0l1.6 4.4L12 6l-4.4 1.6L6 12 4.4 7.6 0 6l4.4-1.6z" fill="' + c + '"/></svg>';
+const HEART = '<svg width="16" height="15" viewBox="0 0 16 15"><path d="M8 14.5S0 9.6 0 4.3C0 1.9 1.9 0 4.2 0 5.8 0 7.2.9 8 2.2 8.8.9 10.2 0 11.8 0 14.1 0 16 1.9 16 4.3c0 5.3-8 10.2-8 10.2z" fill="#e0313f"/></svg>';
+
+function burst(x, y, n, colors, kind, dist) {
+  for (let i = 0; i < n; i++) {
+    const c = colors[i % colors.length];
+    const b = bit(x - 6, y - 6, kind === "star" ? STAR(c) : "", kind === "star" ? null : { width: "6px", height: "6px", borderRadius: "50%", background: c });
+    const a = i / n * Math.PI * 2 + rand(-.2, .2), d = dist * rand(.6, 1.1);
+    b.animate([
+      { transform: "translate(0,0) scale(.4) rotate(0)", opacity: 1 },
+      { transform: "translate(" + Math.cos(a) * d + "px," + Math.sin(a) * d + "px) scale(1) rotate(" + rand(90, 270) + "deg)", opacity: 1, offset: .6 },
+      { transform: "translate(" + Math.cos(a) * d * 1.1 + "px," + (Math.sin(a) * d * 1.1 + 24) + "px) scale(.6)", opacity: 0 }
+    ], { duration: rand(900, 1300), easing: "cubic-bezier(.16,1,.3,1)" }).onfinish = () => b.remove();
+  }
+}
+function fireworks(x, y, rounds) {
+  const sets = [["#f2c14e", "#ffffff"], ["#e0313f", "#f2a93b"], ["#1677c2", "#4aa3df", "#ffffff"]];
+  for (let k = 0; k < rounds; k++) setTimeout(() => burst(x + rand(-60, 60), y - rand(20, 110), 22, sets[k % 3], "dot", rand(60, 95)), k * 380);
+}
+function confetti(x, y, n) {
+  const cols = ["#e0313f", "#1677c2", "#f2a93b", "#2f9e6e", "#7b5cd6", "#c23b8c"];
+  for (let i = 0; i < n; i++) {
+    const b = bit(x + rand(-30, 30), y + rand(-10, 10), "", { width: rand(5, 8) + "px", height: rand(3, 6) + "px", background: cols[i % cols.length], borderRadius: "1px" });
+    const dx = rand(-160, 160), up = rand(60, 160), dn = rand(180, 360);
+    b.animate([
+      { transform: "translate(0,0) rotate(0)", opacity: 1 },
+      { transform: "translate(" + dx * .5 + "px," + -up + "px) rotate(" + rand(-360, 360) + "deg)", offset: .3, easing: "ease-in" },
+      { transform: "translate(" + dx + "px," + dn + "px) rotate(" + rand(-720, 720) + "deg)", opacity: 0 }
+    ], { duration: rand(1400, 2200) }).onfinish = () => b.remove();
+  }
+}
+function hearts(x, y) {
+  for (let i = 0; i < 7; i++) {
+    const b = bit(x - 8 + rand(-24, 24), y, HEART);
+    b.animate([
+      { transform: "translateY(0) scale(.5)", opacity: 0 },
+      { transform: "translateY(-30px) scale(1)", opacity: 1, offset: .25 },
+      { transform: "translate(" + rand(-30, 30) + "px,-" + rand(110, 170) + "px) scale(.8)", opacity: 0 }
+    ], { duration: rand(1400, 2000), delay: i * 90, easing: "cubic-bezier(.2,.7,.3,1)", fill: "backwards" }).onfinish = () => b.remove();
+  }
+}
+function ping(r) {
+  const b = bit(r.left + 12, r.top + 10, "", { width: "34px", height: "34px", borderRadius: "50%", boxShadow: "0 0 0 2px #1677c2" });
+  b.animate([{ transform: "scale(.6)", opacity: 1 }, { transform: "scale(2.2)", opacity: 0 }], { duration: 900, easing: "cubic-bezier(.16,1,.3,1)" }).onfinish = () => b.remove();
+}
+// 3. Booking milestones.
+function afterBooking(id, date) {
+  // a proper holiday: five or more working days in a row
+  let run = 0, t = parse(date);
+  const back = new Date(t); while (true) { back.setDate(back.getDate() - 1); const s = iso(back.getFullYear(), back.getMonth(), back.getDate()); if (isFree(s)) continue; if (has(id, s)) run++; else break; }
+  const fwd = new Date(t);  while (true) { fwd.setDate(fwd.getDate() + 1);   const s = iso(fwd.getFullYear(), fwd.getMonth(), fwd.getDate());   if (isFree(s)) continue; if (has(id, s)) run++; else break; }
+  if (run + 1 === 5) setTimeout(() => { toast("Bon voyage, " + id + "! A whole week off."); planeRoll(); }, 900);
+  if (offOn(date).length === EMPLOYEES.length) setTimeout(() => toast("Everyone's off. Last one out switches off the lights."), 900);
+}
+// 4. Konami code → snow. Type "ferie" → confetti. Type "genova" → the Lanterna sweeps the room. Type "aereo"/"plane" → take-off.
+const KONAMI = ["ArrowUp","ArrowUp","ArrowDown","ArrowDown","ArrowLeft","ArrowRight","ArrowLeft","ArrowRight","b","a"];
+let keys = [], typed = "";
+function onKey(e) {
+  if (state.who || (e.target.closest && e.target.closest("input,textarea"))) return;
+  keys = [...keys, e.key].slice(-10);
+  if (keys.join() === KONAMI.join()) { keys = []; snow(); return; }
+  if (e.key.length === 1) {
+    typed = (typed + e.key.toLowerCase()).slice(-12);
+    if (typed.endsWith("ferie")) { confetti(innerWidth / 2, innerHeight * .3, 90); planeHop(); toast("Ferie! Book them before someone else does."); }
+    if (typed.endsWith("genova")) lanterna();
+    if (typed.endsWith("aereo") || typed.endsWith("plane")) planeRoll();
+  }
+  if (!state.who && (e.key === "ArrowLeft" || e.key === "ArrowRight") && !keys.slice(0, -1).join().includes("ArrowUp,ArrowUp")) {
+    goMonth(state.month + (e.key === "ArrowRight" ? 1 : -1));
+  }
+}
+function snow() {
+  if (REDUCED) return;
+  toast("Snow day.");
+  const end = Date.now() + 12000;
+  (function drop() {
+    if (Date.now() > end) return;
+    const s = rand(3, 7);
+    const f = bit(rand(0, innerWidth), -10, "", { width: s + "px", height: s + "px", borderRadius: "50%", background: "#fff", boxShadow: "0 0 3px rgba(0,0,0,.18)" });
+    f.animate([{ transform: "translate(0,0)" }, { transform: "translate(" + rand(-80, 80) + "px," + (innerHeight + 20) + "px)" }], { duration: rand(5000, 9000), easing: "linear" }).onfinish = () => f.remove();
+    setTimeout(drop, 70);
+  })();
+}
+function lanterna() {
+  if (REDUCED) return;
+  toast("Ciao Genova — the Lanterna is on.");
+  const beam = bit(0, 0, "", { position: "fixed", inset: "0", width: "100vw", height: "100vh", background: "linear-gradient(100deg, transparent 35%, rgba(255,236,170,.45) 48%, rgba(255,250,225,.6) 50%, rgba(255,236,170,.45) 52%, transparent 65%)", mixBlendMode: "soft-light" });
+  beam.animate([{ transform: "translateX(-100%)" }, { transform: "translateX(100%)" }], { duration: 1800, easing: "cubic-bezier(.45,0,.55,1)" }).onfinish = () => beam.remove();
+}
+
+// 5. Little things.
+let tears = [];
+function tearRhythm() {
+  const now = Date.now();
+  tears = [...tears.filter(t => now - t < 4000), now];
+  if (tears.length === 4) toast("Easy — there are only three months.");
+}
+const WEEKEND_LINES = ["Weekend — already yours.", "Sunday. Even the ships rest.", "Saturday: the office is a myth.", "No need to book this one."];
+let weekendLine = 0;
+function onSheetClick(e) {
+  const cell = e.target.closest(".c");
+  if (!cell) return;
+  const date = cell.dataset.date;
+  if (cell.tagName === "BUTTON") { toggleMine(date); return; }
+  if (cell.classList.contains("out")) {
+    const t = parse(date);
+    const idx = SEASON.findIndex(([y, m]) => y === t.getFullYear() && m === t.getMonth());
+    if (idx >= 0) goMonth(idx);
+    else toast(t.getMonth() === 10 ? "November is over. Mostly." : "March? Let's get through February first.");
     return;
   }
-
-  // Identity locked — hide the big bar, show compact card in the hero top-right
-  document.body.classList.remove("no-identity");
-  if (identityBar) identityBar.hidden = true;
-
-  const me = EMP_BY_ID[state.me];
-  if (heroSlot) {
-    heroSlot.hidden = false;
-    heroSlot.innerHTML =
-      '<div class="hero-id-block" style="--me-color:' + me.color + '">' +
-        '<span class="identity-swatch" style="background:' + me.color + '"></span>' +
-        '<div class="hero-id-text">' +
-          '<span class="identity-name">You<strong>' + me.id + '</strong></span>' +
-          '<div class="identity-dept">' + me.deptName + '</div>' +
-        '</div>' +
-        '<button id="btn-switch-user" class="chip-btn hero-id-btn" title="Switch user (admin password required)">Switch</button>' +
-      '</div>';
-
-    document.getElementById("btn-switch-user")?.addEventListener("click", () => {
-      const pwd = prompt("Admin password to switch user:");
-      if (pwd === null) return;
-      if (pwd !== ADMIN_PASSWORD) { alert("Wrong password."); return; }
-      if (!confirm("Switch user? Your holidays stay saved in this browser.")) return;
-      transitionBrandPosition(() => { state.me = null; saveState(); renderAll(); });
-    });
-  }
+  if (HOLIDAYS[date]) { toast(HOLIDAYS[date] + " — a public holiday, everyone's off."); return; }
+  toast(WEEKEND_LINES[weekendLine++ % WEEKEND_LINES.length]);
 }
 
-/* ============================================================
-   Month nav
-   ============================================================ */
-function renderMonthNav() {
-  const m = state.activeMonth;
-  document.getElementById("active-month-name").textContent = MONTH_NAMES[m];
-  document.getElementById("active-month-year").textContent = YEAR;
-
-  const tabs = document.getElementById("month-tabs");
-  tabs.innerHTML = "";
-  for (const mi of MONTHS) {
-    const btn = document.createElement("button");
-    btn.className = "month-tab" + (mi === state.activeMonth ? " active" : "");
-    btn.textContent = MONTH_SHORT[mi];
-    btn.addEventListener("click", () => {
-      state.activeMonth = mi;
-      saveState();
-      renderActiveMonth();
-      renderMonthNav();
-      renderMiniMonths();
-    });
-    tabs.appendChild(btn);
-  }
-
-  const i = MONTHS.indexOf(state.activeMonth);
-  document.getElementById("month-prev").disabled = i <= 0;
-  document.getElementById("month-next").disabled = i >= MONTHS.length - 1;
+let idleT;
+function resetIdle() {
+  clearTimeout(idleT);
+  
 }
 
-function stepMonth(delta) {
-  const i = MONTHS.indexOf(state.activeMonth);
-  const ni = Math.min(MONTHS.length - 1, Math.max(0, i + delta));
-  if (ni === i) return;
-  state.activeMonth = MONTHS[ni];
-  saveState();
-  renderActiveMonth();
-  renderMonthNav();
-  renderMiniMonths();
-}
-
-/* ============================================================
-   THE GRID
-   ============================================================ */
-function renderActiveMonth() {
-  const container = document.getElementById("month-view");
-  container.innerHTML = "";
-
-  const m = state.activeMonth;
-  const dim = daysInMonth(YEAR, m);
-  const today = todayIso();
-
-  const scroll = document.createElement("div");
-  scroll.className = "grid-scroll";
-  container.appendChild(scroll);
-
-  const grid = document.createElement("div");
-  grid.className = "grid";
-  grid.style.gridTemplateColumns = "minmax(95px, 110px) repeat(" + dim + ", 1fr)";
-  scroll.appendChild(grid);
-
-  // Top-left corner — italic month abbreviation
-  const corner = document.createElement("div");
-  corner.className = "g-corner";
-  corner.textContent = MONTH_SHORT[m];
-  grid.appendChild(corner);
-
-  // Day headers (top row)
-  for (let d = 1; d <= dim; d++) {
-    const dateStr = isoDate(YEAR, m, d);
-    const w = weekdayMon0(YEAR, m, d);
-    const isWE = w >= 5;
-    const isHoliday = !!HOLIDAYS[dateStr];
-    const isToday = dateStr === today;
-
-    const head = document.createElement("div");
-    head.className = "g-day-h";
-    if (isWE) head.classList.add("weekend");
-    if (isHoliday) head.classList.add("holiday");
-    if (isToday) head.classList.add("today");
-    head.title = WEEKDAY_LABELS[w] + " " + d + (isHoliday ? " — " + HOLIDAYS[dateStr] : "");
-    head.innerHTML = '<span class="wd">' + WEEKDAY_SHORT[w] + '</span><span class="num">' + d + '</span>';
-    grid.appendChild(head);
-  }
-
-  // Body rows
-  for (const dept of DEPARTMENTS) {
-    const visibleMembers = dept.members.filter(id => state.visible.has(id));
-    if (!visibleMembers.length) continue;
-
-    const divider = document.createElement("div");
-    divider.className = "g-divider";
-    divider.textContent = dept.name;
-    grid.appendChild(divider);
-
-    for (const memberId of visibleMembers) {
-      const emp = EMP_BY_ID[memberId];
-      const isMe = emp.id === state.me;
-
-      const name = document.createElement("div");
-      name.className = "g-name" + (isMe ? " is-me" : "");
-      if (isMe) name.style.setProperty("--me-color", emp.color);
-      name.innerHTML = '<span class="swatch" style="background:' + emp.color + '"></span>' + emp.id;
-      grid.appendChild(name);
-
-      for (let d = 1; d <= dim; d++) {
-        const dateStr = isoDate(YEAR, m, d);
-        const w = weekdayMon0(YEAR, m, d);
-        const isWE = w >= 5;
-        const isHoliday = !!HOLIDAYS[dateStr];
-
-        const cell = document.createElement("div");
-        cell.className = "g-cell";
-        if (isWE) cell.classList.add("weekend");
-        if (isHoliday) cell.classList.add("holiday");
-        if (isMe) {
-          cell.classList.add("is-me-cell");
-          cell.style.setProperty("--me-color", emp.color);
-        }
-
-        const off = (state.selections[emp.id] || new Set()).has(dateStr);
-        if (off) {
-          cell.classList.add("off");
-          cell.style.setProperty("--off-color", emp.color);
-
-          for (const other of dept.members) {
-            if (other === emp.id) continue;
-            if (!state.visible.has(other)) continue;
-            if ((state.selections[other] || new Set()).has(dateStr)) {
-              cell.classList.add("conflict");
-              break;
-            }
-          }
-        }
-
-        if (isMe && !isWE && !isHoliday) {
-          cell.classList.add("editable");
-          cell.title = "Toggle holiday on " + dateStr;
-          cell.addEventListener("click", () => {
-            toggleDay(state.me, dateStr);
-            renderActiveMonth();
-            renderSummary();
-          });
-        } else {
-          cell.title = emp.id + " — " + dateStr + (off ? " — off" : "");
-        }
-
-        grid.appendChild(cell);
-      }
-    }
-  }
-}
-
-/* ============================================================
-   Side panel
-   ============================================================ */
-function renderFilterList() {
-  const container = document.getElementById("filter-list");
-  container.innerHTML = "";
-
-  for (const dept of DEPARTMENTS) {
-    const block = document.createElement("div");
-    block.className = "filter-dept-block";
-
-    // department header — click to toggle whole dept
-    const allOn = dept.members.every(id => state.visible.has(id));
-    const anyOn = dept.members.some(id => state.visible.has(id));
-    const head = document.createElement("button");
-    head.className = "filter-dept-head" + (allOn ? " all-on" : (anyOn ? " some-on" : " all-off"));
-    head.title = allOn ? "Hide whole department" : "Show whole department";
-    head.innerHTML = '<span class="filter-dept-name">' + dept.name + '</span>'
-                   + '<span class="filter-dept-toggle">' + (allOn ? "all" : (anyOn ? "some" : "none")) + '</span>';
-    head.addEventListener("click", () => {
-      if (allOn) {
-        for (const id of dept.members) state.visible.delete(id);
-      } else {
-        for (const id of dept.members) state.visible.add(id);
-      }
-      saveState();
-      renderActiveMonth();
-      renderFilterList();
-    });
-    block.appendChild(head);
-
-    // employee chips for the dept
-    const row = document.createElement("div");
-    row.className = "filter-row";
-    for (const id of dept.members) {
-      const emp = EMP_BY_ID[id];
-      const chip = document.createElement("button");
-      const on = state.visible.has(id);
-      const isMe = id === state.me;
-      chip.className = "filter-chip" + (on ? "" : " off") + (isMe ? " is-me" : "");
-      chip.title = on ? "Hide on calendar" : "Show on calendar";
-      chip.innerHTML = '<span class="swatch" style="background:' + emp.color + '"></span>' + emp.id + (isMe ? " · you" : "");
-      chip.addEventListener("click", () => {
-        if (on) state.visible.delete(id); else state.visible.add(id);
-        saveState();
-        renderActiveMonth();
-        renderFilterList();
-      });
-      row.appendChild(chip);
-    }
-    block.appendChild(row);
-    container.appendChild(block);
-  }
-}
-
-function renderSummary() {
-  const container = document.getElementById("summary");
-  container.innerHTML = "";
-  const employeesSorted = [...EMPLOYEES].sort((a,b) => a.id.localeCompare(b.id));
-  let total = 0;
-  let any = false;
-  for (const emp of employeesSorted) {
-    const count = (state.selections[emp.id] || new Set()).size;
-    total += count;
-    if (count === 0) continue;
-    any = true;
-    const isMe = emp.id === state.me;
-    const row = document.createElement("div");
-    row.className = "summary-row";
-    row.innerHTML =
-      '<span class="label">' +
-        '<span class="swatch" style="background:' + emp.color + '"></span>' + emp.id +
-        (isMe ? ' <span style="color:#8a8475;font-weight:400;font-size:11px">· you</span>' : '') +
-      '</span>' +
-      '<span class="count">' + count + ' d</span>';
-    container.appendChild(row);
-  }
-  if (!any) {
-    container.innerHTML = '<p class="summary-empty">— no holidays planned yet.</p>';
-  } else {
-    const totalRow = document.createElement("div");
-    totalRow.className = "summary-row";
-    totalRow.style.marginTop = "6px";
-    totalRow.style.borderTop = "1px solid rgba(15,20,25,0.06)";
-    totalRow.style.paddingTop = "8px";
-    totalRow.style.fontWeight = "600";
-    totalRow.innerHTML = '<span class="label">Total</span><span class="count">' + total + ' d</span>';
-    container.appendChild(totalRow);
-  }
-}
-
-/* ============================================================
-   Render all
-   ============================================================ */
-
-
-function renderMiniMonths() {
-  const container = document.getElementById("mini-months");
-  if (!container) return;
-  container.innerHTML = "";
-  const today = todayIso();
-
-  for (const m of MONTHS) {
-    // Show all months, including the active one, so you always see the 3-month strip.
-
-    const card = document.createElement("button");
-    card.className = "mini-month" + (m === state.activeMonth ? " active" : "");
-    card.title = m === state.activeMonth ? MONTH_NAMES[m] + " (currently open)" : "Open " + MONTH_NAMES[m];
-    card.addEventListener("click", () => {
-      state.activeMonth = m;
-      saveState();
-      renderActiveMonth();
-      renderMonthNav();
-      renderMiniMonths();
-      window.scrollTo({ top: 0, behavior: "smooth" });
-    });
-
-    const head = document.createElement("div");
-    head.className = "mini-month-head";
-    head.innerHTML = '<span class="mini-month-name">' + MONTH_NAMES[m] + '</span>'
-                   + '<span class="mini-month-year">' + YEAR + '</span>';
-    card.appendChild(head);
-
-    const wd = document.createElement("div");
-    wd.className = "mini-weekdays";
-    for (const lbl of WEEKDAY_SHORT) {
-      const c = document.createElement("div");
-      c.textContent = lbl;
-      wd.appendChild(c);
-    }
-    card.appendChild(wd);
-
-    const grid = document.createElement("div");
-    grid.className = "mini-days";
-
-    const lead = weekdayMon0(YEAR, m, 1);
-    for (let i = 0; i < lead; i++) {
-      const empty = document.createElement("div");
-      empty.className = "mini-day empty";
-      grid.appendChild(empty);
-    }
-
-    const dim = daysInMonth(YEAR, m);
-    for (let d = 1; d <= dim; d++) {
-      const dateStr = isoDate(YEAR, m, d);
-      const w = weekdayMon0(YEAR, m, d);
-      const isWE = w >= 5;
-      const isHoliday = !!HOLIDAYS[dateStr];
-
-      const cell = document.createElement("div");
-      cell.className = "mini-day";
-      if (isWE) cell.classList.add("weekend");
-      if (isHoliday) cell.classList.add("holiday");
-      if (dateStr === today) cell.classList.add("today");
-
-      const here = [];
-      for (const emp of EMPLOYEES) {
-        if (!state.visible.has(emp.id)) continue;
-        if ((state.selections[emp.id] || new Set()).has(dateStr)) here.push(emp);
-      }
-      const byDept = {};
-      for (const emp of here) byDept[emp.dept] = (byDept[emp.dept] || 0) + 1;
-      if (Object.values(byDept).some(n => n >= 2)) cell.classList.add("conflict");
-
-      if (here.length > 0) {
-        cell.classList.add("has-people");
-        // Heat-map by headcount: 1 = green, 2 = yellow, 3 = orange, 4+ = red
-        cell.classList.add("heat-" + Math.min(here.length, 4));
-      }
-
-      cell.textContent = d;
-      grid.appendChild(cell);
-    }
-    card.appendChild(grid);
-    container.appendChild(card);
-  }
-}
-
-function renderAll() {
-  renderIdentityBar();
-  renderMonthNav();
-  renderActiveMonth();
-  renderMiniMonths();
-  renderFilterList();
-  renderSummary();
-  renderPendingBar();
-  const adm = document.getElementById("admin-badge");
-  if (adm) adm.hidden = !ADMIN_MODE;
-}
-
-function renderPendingBar() {
-  const bar = document.getElementById("pending-bar");
-  if (bar) bar.hidden = true; // auto-save mode — bar disabled
-}
-
-/* ============================================================
-   Status / toast
-   ============================================================ */
-let statusTimer = null;
-function setStatus(msg) {
-  const el = document.getElementById("status");
-  if (!el) return;
+/* ---------------- toast ---------------- */
+let toastT;
+function toast(msg) {
+  const el = $("#toast");
   el.textContent = msg;
-  clearTimeout(statusTimer);
-  statusTimer = setTimeout(() => { el.textContent = ""; }, 4000);
-}
-let toastTimer = null;
-function showToast(msg) {
-  const el = document.getElementById("toast");
-  el.textContent = msg;
-  el.hidden = false;
-  clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => { el.hidden = true; }, 2400);
+  el.classList.add("show");
+  clearTimeout(toastT);
+  toastT = setTimeout(() => el.classList.remove("show"), 2400);
 }
 
-/* ============================================================
-   Top-bar actions
-   ============================================================ */
-function exportMine() {
-  if (!state.me) { showToast("Choose who you are first"); return; }
-  const sel = {};
-  sel[state.me] = Array.from(state.selections[state.me] || new Set()).sort();
-  downloadJson({ app:"lightship-holiday-planner", version:3, year:YEAR, exportedBy:state.me, exportedAt:new Date().toISOString(), selections:sel },
-    "holidays-" + state.me + "-" + YEAR + ".json");
-}
-function exportAll() {
-  downloadJson({ app:"lightship-holiday-planner", version:3, year:YEAR, exportedBy:state.me||"admin", exportedAt:new Date().toISOString(), selections:serializeSelections() },
-    "holiday-plan-master-" + YEAR + ".json");
-}
-function downloadJson(payload, filename) {
-  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url; a.download = filename;
-  document.body.appendChild(a); a.click(); a.remove();
-  URL.revokeObjectURL(url);
-  showToast("Exported " + filename);
-}
-function importJson(file) {
-  const reader = new FileReader();
-  reader.onload = () => {
-    try {
-      const obj = JSON.parse(reader.result);
-      if (!obj || !obj.selections) throw new Error("Missing selections");
-      const empIds = Object.keys(obj.selections).filter(id => EMP_BY_ID[id]);
-      if (!empIds.length) { alert("No known employees in that file."); return; }
-      const msg = "Import holidays for: " + empIds.join(", ") + "?\nThis will replace any existing entries for them. Other people are kept as-is.";
-      if (!confirm(msg)) return;
-      for (const empId of empIds) state.selections[empId] = new Set(obj.selections[empId]);
-      saveState();
-      renderAll();
-      showToast("Imported " + empIds.join(", "));
-    } catch (e) {
-      alert("Could not import file: " + e.message);
-    }
-  };
-  reader.readAsText(file);
-}
-function shareMyLink() {
-  if (!state.me) { showToast("Choose who you are first"); return; }
-  const sel = {};
-  sel[state.me] = Array.from(state.selections[state.me] || new Set()).sort();
-  const json = JSON.stringify({ selections: sel });
-  const b64 = btoa(json);
-  const url = location.origin + location.pathname + "#data=" + encodeURIComponent(b64);
-  if (navigator.clipboard) {
-    navigator.clipboard.writeText(url).then(
-      () => showToast("Your share link is in the clipboard"),
-      () => prompt("Copy this link:", url)
-    );
-  } else {
-    prompt("Copy this link:", url);
-  }
-}
-
-/* ============================================================
-   Init
-   ============================================================ */
+/* ---------------- init ---------------- */
 function init() {
-  loadState();
-  // Snapshot current as "saved" to avoid false-positive pending bar at startup
-  setSavedMine();
-  renderAll();
+  const now = new Date();
+  const cur = SEASON.findIndex(([y, m]) => y === now.getFullYear() && m === now.getMonth());
+  state.month = cur >= 0 ? cur : 0;
+  try {
+    for (const [id, arr] of Object.entries(JSON.parse(localStorage.getItem(CACHE_KEY) || "{}"))) if (EMP[id]) state.sel[id] = new Set(arr);
+  } catch (e) {}
 
-  // Start Firebase — this attaches a real-time listener that will keep everyone
-  // in sync automatically. No polling needed for correctness; the interval below
-  // is just a safety net in case the socket drops.
+  loadMe();
+  renderSheet();
+  renderNav();
+  renderMe();
+  initPlane();
+  if (!state.me) openWho("pick");
   initFirebase();
-  setInterval(() => {
-    if (document.hidden) return;
-    if (!firebaseDb || !firebaseReady) pullFromBin();
-  }, POLL_INTERVAL_MS);
-  document.addEventListener("visibilitychange", () => {
-    if (!document.hidden && (!firebaseDb || !firebaseReady)) pullFromBin();
-  });
+  if (DRY_RUN) setSync("");
 
-  document.getElementById("btn-export")?.addEventListener("click", exportMine);
-  document.getElementById("btn-export-all")?.addEventListener("click", exportAll);
-  document.getElementById("btn-import")?.addEventListener("click", () => {
-    document.getElementById("file-import")?.click();
+  $("#sheet").addEventListener("click", onSheetClick);
+  $("#sheet").addEventListener("pointerover", onEggHover);
+  $("#who").addEventListener("click", onWhoClick);
+  $("#who").addEventListener("submit", onWhoSubmit);
+  $("#me").addEventListener("click", e => { if (e.target.closest(".me-switch")) openWho("password"); });
+  document.addEventListener("keydown", e => {
+    if (e.key === "Escape" && state.who && state.me) closeWho();
+    onKey(e);
+    resetIdle();
   });
-  document.getElementById("file-import")?.addEventListener("change", (e) => {
-    const f = e.target.files && e.target.files[0];
-    if (f) importJson(f);
-    e.target.value = "";
+  $(".glue").addEventListener("click", () => {
+    const pad = $("#pad");
+    pad.classList.remove("wobble"); void pad.offsetWidth; pad.classList.add("wobble");
+    toast("That's the glue. Tear from the months up top.");
   });
-  document.getElementById("btn-share")?.addEventListener("click", shareMyLink);
-  document.getElementById("btn-reset")?.addEventListener("click", () => {
-    if (!confirm("Clear ALL holidays for EVERYONE in this browser? This is admin-level.")) return;
-    state.selections = {};
-    saveState();
-    renderAll();
-    showToast("Everything cleared");
-  });
+  ["pointermove", "pointerdown", "scroll"].forEach(t => addEventListener(t, resetIdle, { passive: true }));
+  addEventListener("resize", () => { renderNav(); planeCheck(); });
+  document.fonts?.ready.then(renderNav);
+  resetIdle();
 
-  document.getElementById("month-prev").addEventListener("click", () => stepMonth(-1));
-  document.getElementById("month-next").addEventListener("click", () => stepMonth(1));
-
-  document.getElementById("filter-all").addEventListener("click", () => {
-    state.visible = new Set(EMPLOYEES.map(e => e.id));
-    saveState(); renderActiveMonth(); renderFilterList();
-  });
-  document.getElementById("filter-none").addEventListener("click", () => {
-    state.visible = new Set();
-    saveState(); renderActiveMonth(); renderFilterList();
-  });
-  document.getElementById("btn-confirm")?.addEventListener("click", () => {
-    if (!state.me) { showToast("Pick your initials first"); return; }
-    if (!hasPendingChanges()) return;
-    pushToBin();
-  });
-  document.getElementById("btn-discard")?.addEventListener("click", () => {
-    if (!hasPendingChanges()) return;
-    if (!confirm("Discard unsaved changes?")) return;
-    discardPending();
-  });
-
-  document.getElementById("filter-mine").addEventListener("click", () => {
-    if (state.me) state.visible = new Set([state.me]);
-    else showToast("Choose who you are first");
-    saveState(); renderActiveMonth(); renderFilterList();
-  });
-
-  document.addEventListener("keydown", (e) => {
-    if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA") return;
-    if (e.key === "ArrowLeft") stepMonth(-1);
-    else if (e.key === "ArrowRight") stepMonth(1);
-  });
-
-  // If user closes/reloads tab while a push is pending, fire it synchronously
-  window.addEventListener("beforeunload", () => {
-    if (!pushTimer) return;
-    clearTimeout(pushTimer); pushTimer = null;
-    try {
-      const merged = serializeSelections();
-      const payload = JSON.stringify({ selections: merged, updatedAt: new Date().toISOString() });
-      const blob = new Blob([payload], { type: "application/json" });
-      // sendBeacon doesn't allow custom headers; use keepalive fetch instead
-      fetch(BIN_URL, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json", "X-Master-Key": MASTER_KEY },
-        body: payload,
-        keepalive: true
-      });
-    } catch (e) { /* best effort */ }
-  });
-
-  document.querySelectorAll("[data-admin]").forEach(el => { el.hidden = !ADMIN_MODE; });
-  setStatus("ready");
+  console.log("%c  ✈  Lightship Chartering Genova", "font: 600 14px Jost, sans-serif; color:#1677c2");
+  console.log("Looking for secrets? Try typing ferie, genova or aereo. Old gamers know another code.");
 }
 
 document.addEventListener("DOMContentLoaded", init);
