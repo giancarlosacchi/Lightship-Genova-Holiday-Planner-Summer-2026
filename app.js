@@ -459,73 +459,6 @@ function toggleMine(date) {
   if (on) afterBooking(id, date);
 }
 
-/* ---------------- lights behind frosted glass ----------------
-   Strings of big vintage bulbs hang behind the page. A sheet of frosted
-   glass sits in front of them, so you only see soft coloured glows that
-   slowly change colour and breathe. Quiet enough to stay in the background. */
-function initLights() {
-  const room = $("#room");
-  if (!room) return;
-  let built = 0;
-  function build() {
-    const W = innerWidth, H = innerHeight;
-    if (Math.abs(W - built) < 40 && room.childElementCount) return;
-    built = W;
-    room.innerHTML = "";
-    const svgNS = "http://www.w3.org/2000/svg";
-    const wires = document.createElementNS(svgNS, "svg");
-    wires.setAttribute("class", "wires");
-    wires.setAttribute("viewBox", "0 0 " + W + " " + H);
-    wires.setAttribute("preserveAspectRatio", "none");
-    room.appendChild(wires);
-
-    // three strings: one sagging across the top, one along the bottom, one looping down the right
-    const strings = [
-      { from: [-.05 * W, .04 * H], to: [1.05 * W, .09 * H], sag: .16 * H },
-      { from: [-.05 * W, .9 * H],  to: [1.05 * W, .84 * H], sag: .1 * H },
-      { from: [.97 * W, -.05 * H], to: [.9 * W, 1.05 * H],  sag: -.07 * W, vertical: true }
-    ];
-    let n = 0;
-    for (const s of strings) {
-      const pts = [];
-      for (let k = 0; k <= 40; k++) {
-        const t = k / 40;
-        const x = s.from[0] + (s.to[0] - s.from[0]) * t, y = s.from[1] + (s.to[1] - s.from[1]) * t;
-        const bow = s.sag * 4 * t * (1 - t);
-        pts.push(s.vertical ? [x + bow, y] : [x, y + bow]);
-      }
-      const path = document.createElementNS(svgNS, "path");
-      path.setAttribute("d", "M" + pts.map(p => p[0].toFixed(1) + " " + p[1].toFixed(1)).join(" L"));
-      wires.appendChild(path);
-
-      const len = s.vertical ? H : W;
-      const count = Math.max(4, Math.round(len / 190));
-      for (let b = 0; b < count; b++) {
-        const t = (b + .5 + rand(-.18, .18)) / count;
-        const i = Math.min(39, Math.floor(t * 40));
-        const [x, y] = pts[i], [x2, y2] = pts[i + 1];
-        const along = Math.atan2(y2 - y, x2 - x) * 180 / Math.PI;
-        // bulbs hang off the wire, roughly downward (or outward on the side string)
-        const hang = (s.vertical ? along - 90 : along + 90) + rand(-28, 28);
-        const bulb = document.createElement("div");
-        bulb.className = "bulb";
-        const size = rand(.85, 1.2);
-        bulb.style.cssText =
-          "left:" + x.toFixed(0) + "px;top:" + y.toFixed(0) + "px;" +
-          "--rot:" + (hang - 90).toFixed(1) + "deg;--s:" + size.toFixed(2) + ";" +
-          "--dur:" + rand(38, 70).toFixed(1) + "s;--delay:" + (-rand(0, 70)).toFixed(1) + "s;" +
-          "--bdur:" + rand(5, 11).toFixed(1) + "s;--bdelay:" + (-rand(0, 11)).toFixed(1) + "s";
-        bulb.innerHTML = '<i class="glow"></i><i class="socket"></i><i class="glass"></i>';
-        room.appendChild(bulb);
-        n++;
-      }
-    }
-  }
-  build();
-  let t;
-  addEventListener("resize", () => { clearTimeout(t); t = setTimeout(build, 250); });
-}
-
 /* ---------------- the plane ----------------
    It rests on an empty square (never on anyone's name). The pointer pushes
    it softly, like the snow used to: it slides ahead of the cursor, gets
@@ -1134,7 +1067,6 @@ function init() {
   renderSheet();
   renderNav();
   renderMe();
-  initLights();
   initPlane();
   if (!state.me) openWho("pick");
   initFirebase();

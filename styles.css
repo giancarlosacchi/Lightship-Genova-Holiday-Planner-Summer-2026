@@ -514,57 +514,50 @@ button.me-tag { font-family: "Patrick Hand", cursive; font-size: 19px; font-weig
   .scribble { font-size: 10.5px; line-height: 1.05; }
 }
 
-/* ---------- behind the page: lights through frosted glass ---------- */
-@property --bc { syntax: "<color>"; inherits: true; initial-value: #ff8a1f; }
-body { background: #7d7d7a; }
-.room {
-  position: fixed; inset: 0; z-index: -2; overflow: hidden; pointer-events: none;
-  background: radial-gradient(120% 90% at 50% 38%, #7a7975, #53534f 70%, #474744);
+/* ---------- behind the page: a TV-studio night ---------- */
+body { background: #03051a; }
+.studio {
+  position: fixed; inset: 0; z-index: -1; overflow: hidden; pointer-events: none;
+  background: radial-gradient(ellipse 85% 75% at 50% 46%, #1d2c86 0%, #111a5a 32%, #080d36 60%, #03051a 100%);
 }
-.wires { position: absolute; inset: 0; width: 100%; height: 100%; fill: none; stroke: #1d1f22; stroke-width: 6; stroke-linecap: round; filter: blur(6px); opacity: .45; }
-.bulb {
-  position: absolute; width: 0; height: 0;
-  transform: rotate(var(--rot)) scale(var(--s)); transform-origin: 0 0;
-  animation: bulbCycle var(--dur) linear var(--delay) infinite;
+.studio i { position: absolute; display: block; }
+/* the glow right behind the calendar */
+.studio .halo {
+  left: 50%; top: 46%; width: 120vmax; height: 120vmax; transform: translate(-50%, -50%);
+  background: radial-gradient(closest-side, rgba(120,150,255,.38), rgba(90,70,200,.16) 40%, transparent 70%);
+  animation: halo 9s ease-in-out infinite alternate;
 }
-.bulb i { position: absolute; display: block; }
-.bulb .glow {
-  left: -175px; top: -125px; width: 350px; height: 350px; border-radius: 50%;
-  background: radial-gradient(closest-side, color-mix(in srgb, var(--bc) 75%, white) 0%, color-mix(in srgb, var(--bc) 62%, transparent) 30%, color-mix(in srgb, var(--bc) 22%, transparent) 55%, transparent 76%);
-  mix-blend-mode: screen;
-  animation: breathe var(--bdur) ease-in-out var(--bdelay) infinite alternate;
+/* light rays fanning out from the middle, turning very slowly */
+.studio .rays {
+  left: 50%; top: 46%; width: 220vmax; height: 220vmax; margin: -110vmax 0 0 -110vmax;
+  -webkit-mask: radial-gradient(closest-side, #000 8%, rgba(0,0,0,.55) 35%, transparent 70%);
+          mask: radial-gradient(closest-side, #000 8%, rgba(0,0,0,.55) 35%, transparent 70%);
 }
-.bulb .socket { left: -9px; top: -6px; width: 18px; height: 28px; border-radius: 3px; background: linear-gradient(90deg, #26282b, #4a4d52 45%, #26282b); filter: blur(4px); opacity: .75; }
-.bulb .glass {
-  left: -22px; top: 18px; width: 44px; height: 68px;
-  border-radius: 50% 50% 50% 50% / 36% 36% 64% 64%;
-  background: radial-gradient(circle at 42% 38%, color-mix(in srgb, var(--bc) 30%, white), var(--bc) 62%, color-mix(in srgb, var(--bc) 75%, black));
-  filter: blur(8px);
-  animation: breathe var(--bdur) ease-in-out var(--bdelay) infinite alternate;
+.studio .r1 { background: repeating-conic-gradient(from 0deg, rgba(150,180,255,.13) 0deg 3.5deg, transparent 3.5deg 15deg); animation: spin 140s linear infinite; }
+.studio .r2 { background: repeating-conic-gradient(from 7deg, rgba(170,120,255,.09) 0deg 2deg, transparent 2deg 22.5deg); animation: spin 200s linear infinite reverse; }
+/* two studio spotlights sweeping from above */
+.studio .spot {
+  top: -20vh; width: 34vw; height: 140vh; transform-origin: 50% 0;
+  background: linear-gradient(180deg, rgba(190,210,255,.22), rgba(140,160,255,.06) 55%, transparent 85%);
+  clip-path: polygon(44% 0, 56% 0, 100% 100%, 0 100%);
+  filter: blur(14px); mix-blend-mode: screen;
 }
-/* each bulb rests on a colour, then slowly drifts to the next */
-@keyframes bulbCycle {
-  0%, 14%   { --bc: #2f7fe0; }
-  20%, 34%  { --bc: #ff3a2a; }
-  40%, 54%  { --bc: #ff8a1f; }
-  60%, 74%  { --bc: #ffe6b8; }
-  80%, 94%  { --bc: #2fd39a; }
-  100%      { --bc: #2f7fe0; }
+.studio .s1 { left: 6vw;  animation: sweepL 17s ease-in-out infinite alternate; }
+.studio .s2 { right: 6vw; animation: sweepR 21s ease-in-out infinite alternate; }
+/* a polished floor catching the light at the bottom */
+.studio .floor {
+  left: -10%; right: -10%; bottom: -28vh; height: 55vh; border-radius: 50%;
+  background: radial-gradient(closest-side, rgba(110,140,255,.28), rgba(60,70,190,.1) 55%, transparent 75%);
 }
-@keyframes breathe { from { opacity: .55; } to { opacity: 1; } }
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes halo { from { opacity: .75; } to { opacity: 1; } }
+@keyframes sweepL { from { transform: rotate(-24deg); } to { transform: rotate(14deg); } }
+@keyframes sweepR { from { transform: rotate(22deg); } to { transform: rotate(-16deg); } }
+@media (prefers-reduced-motion: reduce) { .studio i { animation: none !important; } }
 
-/* the frosted glass in front of them: milky, fine grain, a faint sheen */
-.frost {
-  position: fixed; inset: 0; z-index: -1; pointer-events: none;
-  background:
-    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 .5 -.08'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"),
-    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='600' height='600'%3E%3Cfilter id='m'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.008' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 .22 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23m)'/%3E%3C/svg%3E"),
-    linear-gradient(118deg, rgba(255,255,255,.16) 0%, rgba(255,255,255,0) 32%, rgba(255,255,255,.08) 58%, rgba(255,255,255,0) 80%),
-    rgba(232,233,229,.5);
-  box-shadow: inset 0 0 120px rgba(255,255,255,.25);
-}
-/* the top bar sits on the glass, so give it a touch more body */
-.months { background: rgba(255,255,255,.78); }
+/* the top bar now sits on a dark stage */
+.months { background: rgba(255,255,255,.9); box-shadow: 0 8px 24px -10px rgba(0,0,0,.6); }
+.sheets::after { box-shadow: 0 18px 40px -8px rgba(0,0,0,.55); }
 
 /* ---------- birthdays: real handwriting ---------- */
 .scribble { display: inline-block; max-width: 100%; transform: rotate(var(--tilt, 0deg)) scaleX(var(--sx, 1)); font-size: 16px; word-spacing: .12em; }
