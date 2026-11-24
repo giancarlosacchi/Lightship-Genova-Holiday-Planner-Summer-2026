@@ -391,3 +391,49 @@ body.who-open { overflow: hidden; }
   .chip, .chip.mine { padding: 1px 0; border-radius: 4px; }
   .chip.clash, .chip.mine.clash { box-shadow: inset 0 0 0 1px var(--red); }
 }
+
+/* ---------- 25 December: the tree that builds itself ---------- */
+.xtree { position: fixed; z-index: 44; pointer-events: none; transform-origin: 50% 100%; }
+.xtree svg { width: 100%; height: 100%; overflow: visible; display: block; }
+.xt-shadow { fill: rgba(0,0,0,.13); transform-box: fill-box; transform-origin: center; animation: xtGrow .5s var(--ease) both; }
+.xt-trunk { fill: #8d6e63; transform-box: fill-box; transform-origin: 50% 100%; animation: xtGrow .35s var(--ease) .05s both; }
+.xt-tier { transform-box: fill-box; transform-origin: 50% 100%; animation: xtTier .55s cubic-bezier(.34,1.56,.64,1) both; }
+.xt-tier.t3 { fill: #1e8e3e; animation-delay: .15s; }
+.xt-tier.t2 { fill: #34a853; animation-delay: .32s; }
+.xt-tier.t1 { fill: #5bb974; animation-delay: .49s; }
+.xt-garland { fill: none; stroke: #fbbc04; stroke-width: 1.6; stroke-linecap: round; stroke-dasharray: 60; stroke-dashoffset: 60; animation: xtDraw .5s ease forwards; }
+.xt-garland.g1 { animation-delay: .75s; } .xt-garland.g2 { animation-delay: .85s; } .xt-garland.g3 { animation-delay: .95s; }
+.xt-balls circle {
+  transform-box: fill-box; transform-origin: center;
+  animation: xtPop .35s cubic-bezier(.34,1.8,.5,1) both, xtTwinkle 1.4s ease-in-out infinite;
+  animation-delay: calc(1.05s + var(--d) * .06s), calc(1.6s + var(--d) * .17s);
+}
+.xt-star { fill: #fbbc04; transform-box: fill-box; transform-origin: center; animation: xtStar .6s cubic-bezier(.34,1.6,.5,1) 1.45s both, xtGlow 1.6s ease-in-out 2.1s infinite; }
+.xtree.out { animation: xtOut .4s ease forwards; }
+@keyframes xtGrow { from { transform: scale(0); } }
+@keyframes xtTier { from { transform: translateY(-28px) scale(.4); opacity: 0; } }
+@keyframes xtDraw { to { stroke-dashoffset: 0; } }
+@keyframes xtPop { from { transform: scale(0); } }
+@keyframes xtTwinkle { 50% { opacity: .45; } }
+@keyframes xtStar { from { transform: scale(0) rotate(-180deg); opacity: 0; } }
+@keyframes xtGlow { 50% { transform: scale(1.18); filter: drop-shadow(0 0 4px #fbbc04); } }
+@keyframes xtOut { to { opacity: 0; transform: translateY(6px) scale(.88); } }
+
+/* ---------- 6 January: the Befana's shadow behind the paper ---------- */
+.befana-shadow { position: absolute; inset: 0; z-index: 2; pointer-events: none; overflow: hidden; mix-blend-mode: multiply; animation: bfIn .8s ease both; }
+.befana-shadow svg {
+  position: absolute; left: -35%; top: 40%;
+  width: clamp(170px, 30%, 360px);
+  fill: #2a2326; opacity: .2;
+  filter: blur(9px);
+  animation: bfFly 5.6s cubic-bezier(.45,.05,.55,.95) infinite;
+}
+.befana-shadow.out { animation: bfOut .7s ease forwards; }
+@keyframes bfIn { from { opacity: 0; } }
+@keyframes bfOut { to { opacity: 0; } }
+@keyframes bfFly {
+  0%   { left: -35%; top: 42%; transform: rotate(-8deg) scale(.9); }
+  30%  { top: 20%; transform: rotate(-2deg) scale(1); }
+  60%  { top: 32%; transform: rotate(4deg) scale(1.05); }
+  100% { left: 108%; top: 12%; transform: rotate(-4deg) scale(.95); }
+}

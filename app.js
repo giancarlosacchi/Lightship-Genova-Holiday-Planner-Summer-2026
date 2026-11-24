@@ -215,7 +215,7 @@ function tearStrips(i) {
   for (let k = 0; k < N; k++) {
     const s = document.createElement("div");
     s.className = "strip";
-    const x0 = k * sw, w = sw + 2.5;
+    const x0 = k * sw, w = sw + 6;      // generous overlap: no hairline gaps between strips
     s.style.cssText = "left:" + x0 + "px;width:" + w + "px;height:" + H + "px";
     const copy = sheet.cloneNode(true);
     copy.removeAttribute("id");
@@ -266,10 +266,11 @@ function tearStrips(i) {
     for (const s of strips) {
       const u = s.u;
       const freed = smooth(0, .35, u - front);
-      let rx = grab * (2 + 12 * u * u * u) + freed * 13 * (.45 + .55 * u);
-      let ty = grab * 2.5 * u + freed * 12;
-      rx += (10 + 7 * u - rx) * loose;                         // relax into one gentle curve
-      ty += (11 - ty) * loose;
+      // neighbouring strips only ever differ a little, so the paper never shows steps
+      let rx = grab * (3 + 7 * u * u) + freed * 11;
+      let ty = grab * 2 * u + freed * 10;
+      rx += (12 - rx) * loose;                                  // once loose: one sheet, one curve
+      ty += (10 - ty) * loose;
       s.el.style.transform = "translate3d(0," + ty.toFixed(2) + "px,0) rotateX(" + rx.toFixed(2) + "deg)";
       s.sh.style.opacity = clamp(rx / 36, 0, .85).toFixed(3);
     }
@@ -636,27 +637,111 @@ function planeRoll() {
 /* ---------------- easter eggs ---------------- */
 const EGG_DATES = {
   "2026-12-24": "eve", "2026-12-25": "xmas", "2026-12-31": "nye", "2027-01-01": "newyear",
-  "2027-02-09": "carnival", "2027-02-14": "valentine"
+  "2027-01-06": "befana", "2027-02-09": "carnival", "2027-02-14": "valentine"
 };
 
-// 2. Hover special days.
-const eggCooldown = new Map();
+// 2. Special days come alive while the pointer rests on them, and stop when it leaves.
+let egg = null;                                   // { date, stop }
+const cellRect = date => document.querySelector('.c[data-date="' + date + '"]')?.getBoundingClientRect();
+const NO_HOVER = matchMedia("(hover: none)").matches;
+
+function loop(date, every, fn) {
+  const tick = () => { const r = cellRect(date); if (r) fn(r); };
+  tick();
+  const id = setInterval(tick, every);
+  return () => clearInterval(id);
+}
+
+function startEgg(cell) {
+  const date = cell.dataset.date, kind = cell.dataset.egg;
+  if (egg && egg.date === date) return;
+  stopEgg();
+  const mid = r => [r.left + r.width / 2, r.top + r.height / 2];
+  const stop = ({
+    eve:       () => loop(date, 650, r => { const [x, y] = mid(r); burst(x + rand(-20, 20), y + rand(-12, 12), 10, ["#f2a93b", "#ffffff", "#e0313f"], "star", 55); }),
+    xmas:      () => christmasTree(date),
+    nye:       () => loop(date, 750, r => { const [x, y] = mid(r); fireworks(x, y, 1); }),
+    newyear:   () => loop(date, 520, r => { const [x, y] = mid(r); fireworks(x, y, 1); }),
+    befana:    () => befanaShadow(),
+    carnival:  () => loop(date, 700, r => confetti(r.left + r.width / 2, r.top, 26)),
+    valentine: () => loop(date, 520, r => { const [x, y] = mid(r); hearts(x, y, 3); }),
+    today:     () => loop(date, 1100, r => ping(r))
+  })[kind]?.();
+  if (!stop) return;
+  egg = { date, stop };
+  // keep going while the pointer is on this day (the cell may be redrawn underneath)
+  egg.watch = setInterval(() => {
+    if (NO_HOVER) return;
+    if (!document.querySelector('.c[data-date="' + date + '"]:hover')) stopEgg();
+  }, 200);
+  if (NO_HOVER) egg.timer = setTimeout(stopEgg, 4000);      // phones: a tap plays it for a few seconds
+}
+function stopEgg() {
+  if (!egg) return;
+  clearInterval(egg.watch); clearTimeout(egg.timer);
+  egg.stop();
+  egg = null;
+}
 function onEggHover(e) {
+  if (REDUCED) return;
   const c = e.target.closest("[data-egg]");
-  if (!c || REDUCED) return;
-  const k = c.dataset.date, now = Date.now();
-  if (now - (eggCooldown.get(k) || 0) < 4000) return;
-  eggCooldown.set(k, now);
-  const r = c.getBoundingClientRect(), x = r.left + r.width / 2, y = r.top + r.height / 2;
-  ({
-    eve:      () => burst(x, y, 14, ["#f2a93b", "#ffffff", "#e0313f"], "star", 60),
-    xmas:     () => { burst(x, y, 18, ["#e0313f", "#2f9e6e", "#f2c14e"], "star", 80); },
-    nye:      () => fireworks(x, y, 1),
-    newyear:  () => fireworks(x, y, 3),
-    carnival: () => confetti(x, r.top, 60),
-    valentine:() => hearts(x, y),
-    today:    () => ping(r)
-  })[c.dataset.egg]?.();
+  if (c) startEgg(c);
+}
+
+// 25 December: a Christmas tree builds itself in the square, then its lights twinkle.
+function christmasTree(date) {
+  const r = cellRect(date);
+  const h = Math.max(76, Math.min(118, r.height * .82)), w = h * .78;
+  const el = document.createElement("div");
+  el.className = "xtree";
+  el.style.cssText = "left:" + (r.right - w - 8) + "px;top:" + (r.bottom - h - 6) + "px;width:" + w + "px;height:" + h + "px";
+  el.innerHTML =
+    '<svg viewBox="0 0 78 100" aria-hidden="true">' +
+      '<ellipse class="xt-shadow" cx="39" cy="96" rx="22" ry="3.2"/>' +
+      '<rect class="xt-trunk" x="34" y="80" width="10" height="15" rx="2"/>' +
+      '<path class="xt-tier t3" d="M8 82 L39 46 L70 82 Q39 88 8 82 Z"/>' +
+      '<path class="xt-tier t2" d="M14 62 L39 28 L64 62 Q39 68 14 62 Z"/>' +
+      '<path class="xt-tier t1" d="M21 42 L39 14 L57 42 Q39 47 21 42 Z"/>' +
+      '<path class="xt-garland g1" d="M24 38 Q39 45 54 36"/>' +
+      '<path class="xt-garland g2" d="M17 58 Q39 67 61 56"/>' +
+      '<path class="xt-garland g3" d="M11 78 Q39 87 67 75"/>' +
+      '<g class="xt-balls">' +
+        '<circle cx="31" cy="34" r="3" fill="#ea4335" style="--d:0"/><circle cx="47" cy="40" r="3" fill="#4285f4" style="--d:1"/>' +
+        '<circle cx="24" cy="55" r="3.2" fill="#fbbc04" style="--d:2"/><circle cx="39" cy="61" r="3.2" fill="#ea4335" style="--d:3"/><circle cx="55" cy="53" r="3.2" fill="#4285f4" style="--d:4"/>' +
+        '<circle cx="18" cy="76" r="3.4" fill="#4285f4" style="--d:5"/><circle cx="33" cy="80" r="3.4" fill="#fbbc04" style="--d:6"/><circle cx="50" cy="79" r="3.4" fill="#ea4335" style="--d:7"/><circle cx="63" cy="73" r="3.4" fill="#fbbc04" style="--d:8"/>' +
+      "</g>" +
+      '<path class="xt-star" d="M39 3 L41.9 9.6 L49 10.2 L43.6 14.8 L45.3 21.8 L39 18 L32.7 21.8 L34.4 14.8 L29 10.2 L36.1 9.6 Z"/>' +
+    "</svg>";
+  document.body.appendChild(el);
+  const follow = setInterval(() => {                       // stay on the square if the page scrolls
+    const q = cellRect(date); if (!q) return;
+    el.style.left = (q.right - w - 8) + "px"; el.style.top = (q.bottom - h - 6) + "px";
+  }, 100);
+  return () => {
+    clearInterval(follow);
+    el.classList.add("out");
+    setTimeout(() => el.remove(), 420);
+  };
+}
+
+// 6 January: the Befana flies behind the calendar. You only see her blurred
+// shadow through the paper, as if lit from behind.
+function befanaShadow() {
+  const host = document.createElement("div");
+  host.className = "befana-shadow";
+  host.innerHTML = '<svg viewBox="0 0 120 70" aria-hidden="true"><g>' +
+    '<path d="M4 46 L84 34 L85 37 L5 49 Z"/>' +
+    '<path d="M84 31 C96 26 112 24 118 22 C113 30 108 34 116 40 C106 40 96 42 86 41 Z"/>' +
+    '<path d="M38 41 C36 30 40 20 47 16 L55 18 C58 26 58 34 56 40 Z"/>' +
+    '<circle cx="50" cy="13" r="6"/>' +
+    '<path d="M42 10 L57 2 L60 12 Z"/>' +
+    '<path d="M55 30 C64 34 70 40 72 47 L68 48 C64 42 60 38 54 36 Z"/>' +
+    '<path d="M30 34 C26 30 26 24 30 22 C34 24 34 30 33 34 Z"/></g></svg>';
+  $(".sheets").appendChild(host);
+  return () => {
+    host.classList.add("out");
+    setTimeout(() => host.remove(), 700);
+  };
 }
 
 function bit(x, y, html, css) {
@@ -699,8 +784,8 @@ function confetti(x, y, n) {
     ], { duration: rand(1400, 2200) }).onfinish = () => b.remove();
   }
 }
-function hearts(x, y) {
-  for (let i = 0; i < 7; i++) {
+function hearts(x, y, n = 7) {
+  for (let i = 0; i < n; i++) {
     const b = bit(x - 8 + rand(-24, 24), y, HEART);
     b.animate([
       { transform: "translateY(0) scale(.5)", opacity: 0 },
@@ -779,6 +864,7 @@ function onSheetClick(e) {
     else toast(t.getMonth() === 10 ? "November is over. Mostly." : "March? Let's get through February first.");
     return;
   }
+  if (cell.dataset.egg && NO_HOVER && !REDUCED) startEgg(cell);
   if (HOLIDAYS[date]) { toast(HOLIDAYS[date] + " — a public holiday, everyone's off."); return; }
   toast(WEEKEND_LINES[weekendLine++ % WEEKEND_LINES.length]);
 }
@@ -819,6 +905,11 @@ function init() {
 
   $("#sheet").addEventListener("click", onSheetClick);
   $("#sheet").addEventListener("pointerover", onEggHover);
+  $("#sheet").addEventListener("pointerout", e => {          // stop the moment the pointer leaves that day
+    if (!egg || NO_HOVER) return;
+    const to = e.relatedTarget && e.relatedTarget.closest ? e.relatedTarget.closest(".c") : null;
+    if (!to || to.dataset.date !== egg.date) stopEgg();
+  });
   $("#who").addEventListener("click", onWhoClick);
   $("#who").addEventListener("submit", onWhoSubmit);
   $("#me").addEventListener("click", e => { if (e.target.closest(".me-switch")) openWho("password"); });
