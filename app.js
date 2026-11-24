@@ -27,7 +27,7 @@ const SCRIBBLES = {
 
 // stuck on the page like a vinyl sticker
 const STICKERS = {
-  "2026-12-16": ["Christmas dinner", "Magazi"],
+  "2026-12-16": ["Christmas dinner"],
 };
 
 const DEPARTMENTS = [
@@ -177,7 +177,7 @@ function sheetHTML(i) {
     let inner = '<span class="n">' + t.getDate() + "</span>";
     if (hol && inM) inner += '<span class="hn">' + hol + "</span>";
     if (SCRIBBLES[date] && inM) inner += scribbleHTML(SCRIBBLES[date], date);
-    if (STICKERS[date] && inM) inner += '<span class="sticker" aria-label="' + STICKERS[date].join(", ") + '"><b>' + STICKERS[date][0] + "</b><small>" + STICKERS[date][1] + "</small></span>";
+    if (STICKERS[date] && inM) inner += '<span class="sticker" aria-label="' + STICKERS[date].join(", ") + '"><b>' + STICKERS[date][0] + "</b>" + (STICKERS[date][1] ? "<small>" + STICKERS[date][1] + "</small>" : "") + "</span>";
     if (inM && !isFree(date)) {
       const off = offOn(date);
       if (off.length) {
