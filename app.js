@@ -25,6 +25,11 @@ const SCRIBBLES = {
   "2027-01-10": "Lella's birthday",
 };
 
+// stuck on the page like a vinyl sticker
+const STICKERS = {
+  "2026-12-16": ["Christmas dinner", "Magazi"],
+};
+
 const DEPARTMENTS = [
   { name: "Broker — Gearless", key: "gearless",   members: ["OPE", "MPE", "LDC", "BEE", "MCD"] },
   { name: "Broker — Geared",   key: "geared",     members: ["SDP", "FGA", "IEB"] },
@@ -172,6 +177,7 @@ function sheetHTML(i) {
     let inner = '<span class="n">' + t.getDate() + "</span>";
     if (hol && inM) inner += '<span class="hn">' + hol + "</span>";
     if (SCRIBBLES[date] && inM) inner += scribbleHTML(SCRIBBLES[date], date);
+    if (STICKERS[date] && inM) inner += '<span class="sticker" aria-label="' + STICKERS[date].join(", ") + '"><b>' + STICKERS[date][0] + "</b><small>" + STICKERS[date][1] + "</small></span>";
     if (inM && !isFree(date)) {
       const off = offOn(date);
       if (off.length) {
@@ -505,7 +511,7 @@ function parkingSpots() {
   document.querySelectorAll("#sheet .c").forEach(c => {
     if (c.querySelector(".chips")) return;
     const r = c.getBoundingClientRect();
-    const weight = c.querySelector(".hn, .scribble") ? .3 : c.classList.contains("out") || c.classList.contains("sat") || c.classList.contains("sun") ? 3 : 1;
+    const weight = c.querySelector(".hn, .scribble, .sticker") ? .3 : c.classList.contains("out") || c.classList.contains("sat") || c.classList.contains("sun") ? 3 : 1;
     out.push({ x: r.left - pad.left + r.width * .6, y: r.top - pad.top + r.height * .6, weight, date: c.dataset.date });
   });
   return out;

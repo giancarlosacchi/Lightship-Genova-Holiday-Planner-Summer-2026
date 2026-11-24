@@ -569,3 +569,41 @@ input { cursor: text !important; }
 
 .pz.dust { animation: pzDust .4s ease var(--d) both; }
 @keyframes pzDust { from { opacity: 0; transform: translateY(-6px); } }
+
+/* ---------- a vinyl sticker on the page ---------- */
+.sticker {
+  position: relative;
+  display: inline-flex; flex-direction: column; align-items: center;
+  margin: 2px 0 2px 2px;
+  padding: 5px 11px 6px;
+  border-radius: 9px;
+  background: linear-gradient(160deg, #e9443f 0%, #c8232b 100%);
+  color: #fff;
+  /* die-cut white border, then the sticker's own small shadow */
+  box-shadow: 0 0 0 3px #fff, 0 2px 1px 3px rgba(0,0,0,.08), 1px 5px 9px rgba(0,0,0,.22);
+  transform: rotate(-5deg);
+  line-height: 1.05;
+  text-align: center;
+  overflow: hidden;
+}
+.sticker b { font-weight: 700; font-size: 12.5px; letter-spacing: .02em; text-transform: uppercase; }
+.sticker small { font-family: "Permanent Marker", cursive; font-size: 13px; letter-spacing: .03em; margin-top: 2px; color: #fff4d6; }
+/* glossy vinyl sheen */
+.sticker::before {
+  content: ""; position: absolute; left: -20%; top: -60%; width: 70%; height: 120%;
+  background: linear-gradient(115deg, rgba(255,255,255,0) 30%, rgba(255,255,255,.35) 50%, rgba(255,255,255,0) 70%);
+  transform: rotate(8deg); pointer-events: none;
+}
+/* a tiny lifted corner */
+.sticker::after {
+  content: ""; position: absolute; right: 0; bottom: 0; width: 10px; height: 10px;
+  background: linear-gradient(135deg, rgba(0,0,0,0) 50%, #f3f3f1 50%);
+  box-shadow: -1px -1px 2px rgba(0,0,0,.18);
+  border-top-left-radius: 3px;
+}
+@media (max-width: 760px) {
+  .sticker { padding: 3px 4px 4px; border-radius: 6px; box-shadow: 0 0 0 2px #fff, 1px 3px 6px rgba(0,0,0,.22); }
+  .sticker b { font-size: 8.5px; }
+  .sticker small { font-size: 9px; }
+  .sticker::after { width: 6px; height: 6px; }
+}
