@@ -364,3 +364,30 @@ body.who-open { overflow: hidden; }
   .months .slider { transition: none; }
 }
 
+
+/* ---------- names: whole pastel ovals ---------- */
+.chip, .chip.mine {
+  background: var(--c);
+  color: #202124;
+  box-shadow: none;
+  padding: 2px 9px;
+}
+.chip i, .who-pick i, .me-tag i { display: none; }
+/* yours: a crisp dark ring */
+.chip.mine { box-shadow: inset 0 0 0 1.5px rgba(32,33,36,.72); }
+/* same team, same day: red ring and red text */
+.chip.clash, .chip.mine.clash { background: var(--c); color: #a50e1c; box-shadow: inset 0 0 0 1.5px var(--red); }
+.chip.more { background: none; color: var(--ink-2); box-shadow: none; padding: 2px 2px; }
+.ghost { color: var(--ink-2); box-shadow: inset 0 0 0 1px var(--line); border: 1px dashed transparent; background: none; }
+
+.me-tag { background: var(--c); box-shadow: none; padding: 0 14px; color: #202124; }
+
+.who-pick { background: var(--c); color: #202124; padding: 0 18px; }
+.who-pick:hover { background: var(--c); filter: brightness(.96); }
+.who-pick[aria-pressed="true"] { background: var(--c); color: #202124; box-shadow: 0 0 0 2px #fff, 0 0 0 4px #202124; }
+.who-go:not(:disabled) { color: #202124; }
+
+@media (max-width: 760px) {
+  .chip, .chip.mine { padding: 1px 0; border-radius: 4px; }
+  .chip.clash, .chip.mine.clash { box-shadow: inset 0 0 0 1px var(--red); }
+}

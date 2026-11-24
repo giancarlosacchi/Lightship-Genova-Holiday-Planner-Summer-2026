@@ -24,10 +24,11 @@ const DEPARTMENTS = [
   { name: "Back Office",       key: "backoffice", members: ["MST", "GBE", "CPA", "GCS"] },
   { name: "Sale and Purchase", key: "snp",        members: ["FEG", "ACR"] },
 ];
-const PALETTE = ["#1677c2","#e0313f","#f2a93b","#2f9e6e","#7b5cd6","#0fa3b1","#e56b2f","#c23b8c","#5a8f29","#3d5a98","#d4a017","#8c5a3c","#4aa3df"];
+/* soft pastel fills, in the spirit of Google's note colours; dark text reads on all of them */
+const PALETTE = ["#aecbfa","#f6aea9","#fdd663","#a8dab5","#d7aefb","#a6e3e9","#f9c48f","#fdcfe8","#ccef9c","#c9d1d6","#fff3a3","#e6c9a8","#b4ddd3"];
 const EMPLOYEES = [];
 // colours stay put when someone joins: newcomers get their own entry here
-const OWN_COLOR = { IEB: "#b5476b" };
+const OWN_COLOR = { IEB: "#f3a6c6" };
 let nextColor = 0;
 DEPARTMENTS.forEach(d => d.members.forEach(id => EMPLOYEES.push({ id, dept: d.key, deptName: d.name, color: OWN_COLOR[id] || PALETTE[nextColor++] })));
 const EMP = Object.fromEntries(EMPLOYEES.map(e => [e.id, e]));
