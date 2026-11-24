@@ -405,7 +405,7 @@ body.who-open { overflow: hidden; }
 .xt-garland.g1 { animation-delay: .75s; } .xt-garland.g2 { animation-delay: .85s; } .xt-garland.g3 { animation-delay: .95s; }
 .xt-balls circle {
   transform-box: fill-box; transform-origin: center;
-  animation: xtPop .35s cubic-bezier(.34,1.8,.5,1) both, xtTwinkle 1.4s ease-in-out infinite;
+  animation: xtPop .35s cubic-bezier(.34,1.8,.5,1) both, xtTwinkle var(--tw, 1.4s) ease-in-out infinite;
   animation-delay: calc(1.05s + var(--d) * .06s), calc(1.6s + var(--d) * .17s);
 }
 .xt-star { fill: #fbbc04; transform-box: fill-box; transform-origin: center; animation: xtStar .6s cubic-bezier(.34,1.6,.5,1) 1.45s both, xtGlow 1.6s ease-in-out 2.1s infinite; }
@@ -448,4 +448,52 @@ button.me-tag:active { transform: scale(.96); }
   .brand { display: none; }
   .months { grid-column: 1; grid-row: 1; justify-self: stretch; }
   .right { grid-column: 2; grid-row: 1; }
+}
+
+/* the Befana's passes are drawn by script, each one different */
+.befana-shadow svg { left: 0; top: 0; animation: none; will-change: transform; }
+
+/* ---------- names: sticky notes ---------- */
+.chips { gap: 6px 5px; padding-top: 2px; }
+.chip, .chip.mine, .chip.clash, .chip.mine.clash {
+  position: relative;
+  padding: 4px 9px 3px;
+  border-radius: 1px 1px 3px 1px;
+  /* the gummed strip at the top is a touch darker */
+  background: linear-gradient(180deg, rgba(0,0,0,.07) 0 5px, rgba(0,0,0,0) 5px), var(--c);
+  color: #262626;
+  font-family: "Patrick Hand", "Segoe Print", "Comic Sans MS", cursive;
+  font-size: 16px; font-weight: 400; letter-spacing: .04em; line-height: 1;
+  box-shadow: 0 1px 1px rgba(0,0,0,.1), 1px 3px 5px -2px rgba(0,0,0,.28);
+  transform: rotate(var(--tilt, 0deg));
+}
+/* the bottom edge lifts a little where it isn't stuck */
+.chip::after {
+  content: ""; position: absolute; left: 6%; right: 6%; bottom: -1px; height: 4px;
+  background: linear-gradient(180deg, rgba(0,0,0,0), rgba(0,0,0,.06));
+  border-radius: 0 0 50% 50% / 0 0 100% 100%;
+  pointer-events: none;
+}
+.chip.more { background: none; box-shadow: none; transform: none; font-family: "Patrick Hand", cursive; color: var(--ink-2); padding: 4px 2px; }
+.chip.more::after { content: none; }
+.chip.new { animation: stick .45s cubic-bezier(.2,1.4,.4,1) both; }
+@keyframes stick { from { opacity: 0; transform: translateY(-10px) rotate(calc(var(--tilt, 0deg) * -2)) scale(1.15); box-shadow: 0 10px 14px -6px rgba(0,0,0,.25); } }
+.ghost { font-family: "Patrick Hand", cursive; font-size: 16px; letter-spacing: .04em; border-radius: 1px; box-shadow: none; border: 1.5px dashed var(--line); padding: 3px 8px 2px; }
+
+/* your initials up top and the pick list are sticky notes too */
+button.me-tag { font-family: "Patrick Hand", cursive; font-size: 19px; font-weight: 400; letter-spacing: .05em; border-radius: 1px; padding: 0 14px;
+  background: linear-gradient(180deg, rgba(0,0,0,.07) 0 6px, rgba(0,0,0,0) 6px), var(--c);
+  box-shadow: 0 1px 1px rgba(0,0,0,.1), 1px 3px 6px -2px rgba(0,0,0,.28); transform: rotate(-2deg); }
+.who-pick { font-family: "Patrick Hand", cursive; font-size: 19px; font-weight: 400; letter-spacing: .05em; border-radius: 1px; padding: 0 16px;
+  background: linear-gradient(180deg, rgba(0,0,0,.07) 0 6px, rgba(0,0,0,0) 6px), var(--c);
+  box-shadow: 0 1px 1px rgba(0,0,0,.1), 1px 3px 6px -2px rgba(0,0,0,.25); }
+.who-pick:nth-child(odd) { transform: rotate(-1.5deg); }
+.who-pick:nth-child(even) { transform: rotate(1.5deg); }
+.who-pick:hover { filter: brightness(.97); }
+.who-pick[aria-pressed="true"] { background: linear-gradient(180deg, rgba(0,0,0,.07) 0 6px, rgba(0,0,0,0) 6px), var(--c); box-shadow: 0 0 0 2px #fff, 0 0 0 4px #262626, 1px 6px 10px -2px rgba(0,0,0,.3); transform: rotate(0) scale(1.06); }
+
+@media (max-width: 760px) {
+  .chips { gap: 4px; }
+  .chip, .chip.mine, .chip.clash, .chip.mine.clash { padding: 2px 0 1px; font-size: 12.5px; text-align: center; justify-content: center; border-radius: 1px; transform: rotate(calc(var(--tilt, 0deg) * .5)); }
+  .chip::after { height: 3px; }
 }

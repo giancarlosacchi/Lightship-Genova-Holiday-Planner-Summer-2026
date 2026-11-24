@@ -24,11 +24,10 @@ const DEPARTMENTS = [
   { name: "Back Office",       key: "backoffice", members: ["MST", "GBE", "CPA", "GCS"] },
   { name: "Sale and Purchase", key: "snp",        members: ["FEG", "ACR"] },
 ];
-/* soft pastel fills, in the spirit of Google's note colours; dark text reads on all of them */
-const PALETTE = ["#aecbfa","#f6aea9","#fdd663","#a8dab5","#d7aefb","#a6e3e9","#f9c48f","#fdcfe8","#ccef9c","#c9d1d6","#fff3a3","#e6c9a8","#b4ddd3"];
+const PALETTE = ["#8fd3ff","#ff7eb9","#fff57a","#b8f28a","#c9a7f5","#7ae7e0","#ffb26b","#ffc6d9","#e4f772","#b3c7ff","#ffd166","#ff9e8a","#a8e6c1"];   // real Post-it shades
 const EMPLOYEES = [];
 // colours stay put when someone joins: newcomers get their own entry here
-const OWN_COLOR = { IEB: "#f3a6c6" };
+const OWN_COLOR = { IEB: "#f4a8ff" };
 let nextColor = 0;
 DEPARTMENTS.forEach(d => d.members.forEach(id => EMPLOYEES.push({ id, dept: d.key, deptName: d.name, color: OWN_COLOR[id] || PALETTE[nextColor++] })));
 const EMP = Object.fromEntries(EMPLOYEES.map(e => [e.id, e]));
@@ -66,6 +65,8 @@ const longDate = s => { const t = parse(s); return DAYS[dow(t)] + " " + t.getDat
 const shortDate = s => { const t = parse(s); return DAY3[dow(t)] + " " + t.getDate() + " " + MON3[t.getMonth()]; };
 const isFree = s => { const t = parse(s); return dow(t) >= 5 || !!HOLIDAYS[s]; };
 const rand = (a, b) => a + Math.random() * (b - a);
+// a stable little angle for a sticky note, from its person and day
+const tilt = s => { let h = 7; for (const ch of s) h = (h * 31 + ch.charCodeAt(0)) >>> 0; return ((h % 900) / 100 - 4.5).toFixed(1); };
 
 /* ---------------- Firebase ---------------- */
 function initFirebase() {
@@ -156,7 +157,7 @@ function sheetHTML(i) {
         const cap = innerWidth <= 760 ? 3 : 6;
         const shown = off.length > cap ? off.slice(0, cap - 1) : off;
         inner += '<span class="chips">' + shown.map(e =>
-          '<span class="chip' + (e.id === state.me ? " mine" : "") + (clashOf(date, e) ? " clash" : "") + (state.fresh === e.id + date ? " new" : "") + '" style="--c:' + e.color + '"><i></i>' + e.id + "</span>").join("") +
+          '<span class="chip' + (e.id === state.me ? " mine" : "") + (state.fresh === e.id + date ? " new" : "") + '" style="--c:' + e.color + ';--tilt:' + tilt(e.id + date) + 'deg"><i></i>' + e.id + "</span>").join("") +
           (off.length > shown.length ? '<span class="chip more">+' + (off.length - shown.length) + "</span>" : "") + "</span>";
       }
       const mine = state.me && has(state.me, date);
@@ -647,27 +648,50 @@ let egg = null;                                   // { date, stop }
 const cellRect = date => document.querySelector('.c[data-date="' + date + '"]')?.getBoundingClientRect();
 const NO_HOVER = matchMedia("(hover: none)").matches;
 
-function loop(date, every, fn) {
-  const tick = () => { const r = cellRect(date); if (r) fn(r); };
+const pick = a => a[Math.floor(Math.random() * a.length)];
+const randInt = (a, b) => Math.floor(rand(a, b + 1));
+
+// run fn now and again at a random rhythm, never quite the same twice
+function loop(date, [min, max], fn) {
+  let id = null, alive = true;
+  const tick = () => {
+    if (!alive) return;
+    const r = cellRect(date); if (r) fn(r);
+    id = setTimeout(tick, rand(min, max));
+  };
   tick();
-  const id = setInterval(tick, every);
-  return () => clearInterval(id);
+  return () => { alive = false; clearTimeout(id); };
 }
+const inCell = (r, a = .12, b = .88) => [r.left + r.width * rand(a, b), r.top + r.height * rand(a, b)];
+
+const STAR_SETS = [["#f2a93b", "#ffffff", "#e0313f"], ["#fbbc04", "#fff3a3"], ["#ffffff", "#aecbfa", "#fdd663"], ["#e0313f", "#2f9e6e", "#f2c14e"]];
+const FIRE_SETS = [["#f2c14e", "#ffffff"], ["#e0313f", "#f2a93b"], ["#1677c2", "#4aa3df", "#ffffff"], ["#d7aefb", "#ffffff"], ["#a8dab5", "#fdd663"], ["#f6aea9", "#fdcfe8", "#ffffff"]];
 
 function startEgg(cell) {
   const date = cell.dataset.date, kind = cell.dataset.egg;
   if (egg && egg.date === date) return;
   stopEgg();
-  const mid = r => [r.left + r.width / 2, r.top + r.height / 2];
   const stop = ({
-    eve:       () => loop(date, 650, r => { const [x, y] = mid(r); burst(x + rand(-20, 20), y + rand(-12, 12), 10, ["#f2a93b", "#ffffff", "#e0313f"], "star", 55); }),
-    xmas:      () => christmasTree(date),
-    nye:       () => loop(date, 750, r => { const [x, y] = mid(r); fireworks(x, y, 1); }),
-    newyear:   () => loop(date, 520, r => { const [x, y] = mid(r); fireworks(x, y, 1); }),
-    befana:    () => befanaShadow(),
-    carnival:  () => loop(date, 700, r => confetti(r.left + r.width / 2, r.top, 26)),
-    valentine: () => loop(date, 520, r => { const [x, y] = mid(r); hearts(x, y, 3); }),
-    today:     () => loop(date, 1100, r => ping(r))
+    eve: () => loop(date, [320, 950], r => {
+      const [x, y] = inCell(r);
+      burst(x, y, randInt(6, 14), pick(STAR_SETS), "star", rand(35, 80));
+    }),
+    xmas: () => christmasTree(date),
+    nye: () => loop(date, [350, 1100], r => {
+      const x = r.left + r.width * rand(-.2, 1.2), y = r.top - rand(-10, 120);
+      burst(x, y, randInt(14, 28), pick(FIRE_SETS), "dot", rand(45, 100));
+    }),
+    newyear: () => loop(date, [220, 750], r => {
+      const shots = Math.random() < .3 ? 2 : 1;
+      for (let k = 0; k < shots; k++) setTimeout(() => {
+        const x = r.left + r.width * rand(-.35, 1.35), y = r.top - rand(-20, 150);
+        burst(x, y, randInt(16, 34), pick(FIRE_SETS), "dot", rand(50, 120));
+      }, k * rand(90, 260));
+    }),
+    befana: () => befanaShadow(),
+    carnival: () => loop(date, [260, 900], r => confetti(r.left + r.width * rand(.1, .9), r.top + r.height * rand(0, .45), randInt(10, 34))),
+    valentine: () => loop(date, [650, 1600], r => { const [x, y] = inCell(r, .2, .8); hearts(x, y, randInt(1, 3)); }),
+    today: () => loop(date, [900, 1700], r => ping(r))
   })[kind]?.();
   if (!stop) return;
   egg = { date, stop };
@@ -691,9 +715,15 @@ function onEggHover(e) {
 }
 
 // 25 December: a Christmas tree builds itself in the square, then its lights twinkle.
+// Every time: a slightly different size, baubles in a different order, a different twinkle.
 function christmasTree(date) {
   const r = cellRect(date);
-  const h = Math.max(76, Math.min(118, r.height * .82)), w = h * .78;
+  const h = Math.max(76, Math.min(118, r.height * .82)) * rand(.9, 1.06), w = h * .78;
+  const pos = [[31, 34, 3], [47, 40, 3], [24, 55, 3.2], [39, 61, 3.2], [55, 53, 3.2], [18, 76, 3.4], [33, 80, 3.4], [50, 79, 3.4], [63, 73, 3.4]];
+  const cols = ["#ea4335", "#4285f4", "#fbbc04", "#ffffff", "#d7aefb", "#f6aea9"];
+  const balls = pos.map(([cx, cy, rr]) =>
+    '<circle cx="' + (cx + rand(-1.5, 1.5)).toFixed(1) + '" cy="' + (cy + rand(-1.5, 1.5)).toFixed(1) + '" r="' + rr + '" fill="' + pick(cols) +
+    '" style="--d:' + rand(0, 8).toFixed(2) + ';--tw:' + rand(.9, 2.2).toFixed(2) + 's"/>').join("");
   const el = document.createElement("div");
   el.className = "xtree";
   el.style.cssText = "left:" + (r.right - w - 8) + "px;top:" + (r.bottom - h - 6) + "px;width:" + w + "px;height:" + h + "px";
@@ -707,11 +737,7 @@ function christmasTree(date) {
       '<path class="xt-garland g1" d="M24 38 Q39 45 54 36"/>' +
       '<path class="xt-garland g2" d="M17 58 Q39 67 61 56"/>' +
       '<path class="xt-garland g3" d="M11 78 Q39 87 67 75"/>' +
-      '<g class="xt-balls">' +
-        '<circle cx="31" cy="34" r="3" fill="#ea4335" style="--d:0"/><circle cx="47" cy="40" r="3" fill="#4285f4" style="--d:1"/>' +
-        '<circle cx="24" cy="55" r="3.2" fill="#fbbc04" style="--d:2"/><circle cx="39" cy="61" r="3.2" fill="#ea4335" style="--d:3"/><circle cx="55" cy="53" r="3.2" fill="#4285f4" style="--d:4"/>' +
-        '<circle cx="18" cy="76" r="3.4" fill="#4285f4" style="--d:5"/><circle cx="33" cy="80" r="3.4" fill="#fbbc04" style="--d:6"/><circle cx="50" cy="79" r="3.4" fill="#ea4335" style="--d:7"/><circle cx="63" cy="73" r="3.4" fill="#fbbc04" style="--d:8"/>' +
-      "</g>" +
+      '<g class="xt-balls">' + balls + "</g>" +
       '<path class="xt-star" d="M39 3 L41.9 9.6 L49 10.2 L43.6 14.8 L45.3 21.8 L39 18 L32.7 21.8 L34.4 14.8 L29 10.2 L36.1 9.6 Z"/>' +
     "</svg>";
   document.body.appendChild(el);
@@ -726,25 +752,64 @@ function christmasTree(date) {
   };
 }
 
-// 6 January: the Befana flies behind the calendar. You only see her blurred
-// shadow through the paper, as if lit from behind.
+// 6 January: the Befana flies behind the calendar; you only see her blurred
+// shadow through the paper. Each pass is different: either direction (she always
+// faces the way she flies), higher or lower, nearer or farther, faster or slower.
+const BEFANA =
+  '<path d="M4 46 L84 34 L85 37 L5 49 Z"/>' +                                              // handle, tip in front
+  '<path d="M84 31 C96 26 112 24 118 22 C113 30 108 34 116 40 C106 40 96 42 86 41 Z"/>' +     // bristles, behind
+  '<path d="M62 39 C64 28 60 19 51 15 L45 16 C41 22 40 31 42 40 Z"/>' +                      // cloak, leaning forward
+  '<circle cx="44" cy="12" r="5.5"/>' +                                                        // head
+  '<path d="M39.5 11 L33.5 14 L39.5 15 Z"/>' +                                                 // the famous nose, pointing ahead
+  '<path d="M39 9 C42 3 51 2 55 6 L65 3 L59 11 L50 10 Z"/>' +                                  // headscarf streaming back
+  '<path d="M46 24 L30 39 L33 42 L49 29 Z"/>' +                                                // arm holding the handle
+  '<path d="M45 40 C43 47 39 51 34 53 L35 56 C42 54 47 49 49 41 Z"/>' +                        // legs, dangling forward
+  '<path d="M60 33 C57 25 61 19 68 20 C73 24 72 33 65 37 Z"/>';                                // sack of sweets on her back
+
 function befanaShadow() {
   const host = document.createElement("div");
   host.className = "befana-shadow";
-  // she faces the way she flies (left): nose and arms toward the handle,
-  // the bristles behind her, the sack on her back, the scarf streaming back
-  host.innerHTML = '<svg viewBox="0 0 120 70" aria-hidden="true"><g>' +
-    '<path d="M4 46 L84 34 L85 37 L5 49 Z"/>' +                                              // handle, tip in front
-    '<path d="M84 31 C96 26 112 24 118 22 C113 30 108 34 116 40 C106 40 96 42 86 41 Z"/>' +     // bristles, behind
-    '<path d="M62 39 C64 28 60 19 51 15 L45 16 C41 22 40 31 42 40 Z"/>' +                      // cloak, leaning forward
-    '<circle cx="44" cy="12" r="5.5"/>' +                                                        // head
-    '<path d="M39.5 11 L33.5 14 L39.5 15 Z"/>' +                                                 // the famous nose, pointing ahead
-    '<path d="M39 9 C42 3 51 2 55 6 L65 3 L59 11 L50 10 Z"/>' +                                  // headscarf streaming back
-    '<path d="M46 24 L30 39 L33 42 L49 29 Z"/>' +                                                // arm holding the handle
-    '<path d="M45 40 C43 47 39 51 34 53 L35 56 C42 54 47 49 49 41 Z"/>' +                        // legs, dangling forward
-    '<path d="M60 33 C57 25 61 19 68 20 C73 24 72 33 65 37 Z"/></g></svg>';                     // sack of sweets on her back
   $(".sheets").appendChild(host);
+  let alive = true, wait = null, anim = null;
+
+  function pass() {
+    if (!alive) return;
+    const W = host.clientWidth, H = host.clientHeight;
+    const dir = Math.random() < .5 ? -1 : 1;                     // -1: right to left (as drawn), 1: left to right (mirrored)
+    const size = rand(150, 400);
+    const sh = size * 70 / 120;
+    const y0 = rand(.02, .7) * H, y1 = rand(.02, .7) * H, arc = rand(-.28, .28) * H;
+    const bobs = rand(1, 3.5), bobA = rand(4, 22);
+    const x0 = dir > 0 ? -size - 20 : W + 20, x1 = dir > 0 ? W + 20 : -size - 20;
+    const s0 = rand(.8, 1.15), s1 = rand(.8, 1.15);
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("viewBox", "0 0 120 70");
+    svg.setAttribute("aria-hidden", "true");
+    svg.innerHTML = "<g>" + BEFANA + "</g>";
+    svg.style.width = size + "px";
+    svg.style.filter = "blur(" + rand(6, 12).toFixed(1) + "px)";
+    svg.style.opacity = rand(.14, .27).toFixed(2);
+    host.appendChild(svg);
+    const frames = [];
+    const N = 12;
+    for (let k = 0; k <= N; k++) {
+      const t = k / N;
+      const x = x0 + (x1 - x0) * t;
+      const y = y0 + (y1 - y0) * t + arc * Math.sin(Math.PI * t) + bobA * Math.sin(Math.PI * 2 * bobs * t) - sh / 2;
+      // nose follows the path: tilt from the slope
+      const dy = (y1 - y0) + arc * Math.PI * Math.cos(Math.PI * t) + bobA * Math.PI * 2 * bobs * Math.cos(Math.PI * 2 * bobs * t);
+      const tilt = Math.max(-18, Math.min(18, Math.atan2(dy, Math.abs(x1 - x0)) * 180 / Math.PI)) * dir * .7;
+      const sc = s0 + (s1 - s0) * t;
+      frames.push({ transform: "translate(" + x.toFixed(1) + "px," + y.toFixed(1) + "px) rotate(" + tilt.toFixed(1) + "deg) scale(" + (sc * -dir).toFixed(3) + "," + sc.toFixed(3) + ")" });
+    }
+    const dur = rand(3600, 7800) * Math.sqrt(Math.max(.6, W / 1000));
+    anim = svg.animate(frames, { duration: dur, easing: pick(["linear", "ease-in-out", "cubic-bezier(.3,.1,.5,1)", "cubic-bezier(.5,0,.7,.9)"]) });
+    anim.onfinish = () => { svg.remove(); if (alive) wait = setTimeout(pass, rand(150, 1500)); };
+  }
+  pass();
   return () => {
+    alive = false;
+    clearTimeout(wait);
     host.classList.add("out");
     setTimeout(() => host.remove(), 700);
   };
@@ -760,49 +825,59 @@ function bit(x, y, html, css) {
   return b;
 }
 const STAR = c => '<svg width="12" height="12" viewBox="0 0 12 12"><path d="M6 0l1.6 4.4L12 6l-4.4 1.6L6 12 4.4 7.6 0 6l4.4-1.6z" fill="' + c + '"/></svg>';
-const HEART = '<svg width="16" height="15" viewBox="0 0 16 15"><path d="M8 14.5S0 9.6 0 4.3C0 1.9 1.9 0 4.2 0 5.8 0 7.2.9 8 2.2 8.8.9 10.2 0 11.8 0 14.1 0 16 1.9 16 4.3c0 5.3-8 10.2-8 10.2z" fill="#e0313f"/></svg>';
+const HEART = (c, s) => '<svg width="' + (16 * s).toFixed(1) + '" height="' + (15 * s).toFixed(1) + '" viewBox="0 0 16 15"><path d="M8 14.5S0 9.6 0 4.3C0 1.9 1.9 0 4.2 0 5.8 0 7.2.9 8 2.2 8.8.9 10.2 0 11.8 0 14.1 0 16 1.9 16 4.3c0 5.3-8 10.2-8 10.2z" fill="' + c + '"/></svg>';
 
 function burst(x, y, n, colors, kind, dist) {
   for (let i = 0; i < n; i++) {
     const c = colors[i % colors.length];
-    const b = bit(x - 6, y - 6, kind === "star" ? STAR(c) : "", kind === "star" ? null : { width: "6px", height: "6px", borderRadius: "50%", background: c });
-    const a = i / n * Math.PI * 2 + rand(-.2, .2), d = dist * rand(.6, 1.1);
+    const size = rand(4, 8);
+    const b = bit(x - 6, y - 6, kind === "star" ? STAR(c) : "", kind === "star" ? { transform: "scale(" + rand(.6, 1.3) + ")" } : { width: size + "px", height: size + "px", borderRadius: "50%", background: c });
+    const a = i / n * Math.PI * 2 + rand(-.35, .35), d = dist * rand(.5, 1.15);
+    const fall = rand(14, 40);
     b.animate([
       { transform: "translate(0,0) scale(.4) rotate(0)", opacity: 1 },
-      { transform: "translate(" + Math.cos(a) * d + "px," + Math.sin(a) * d + "px) scale(1) rotate(" + rand(90, 270) + "deg)", opacity: 1, offset: .6 },
-      { transform: "translate(" + Math.cos(a) * d * 1.1 + "px," + (Math.sin(a) * d * 1.1 + 24) + "px) scale(.6)", opacity: 0 }
-    ], { duration: rand(900, 1300), easing: "cubic-bezier(.16,1,.3,1)" }).onfinish = () => b.remove();
+      { transform: "translate(" + Math.cos(a) * d + "px," + Math.sin(a) * d + "px) scale(1) rotate(" + rand(60, 300) + "deg)", opacity: 1, offset: rand(.5, .7) },
+      { transform: "translate(" + Math.cos(a) * d * 1.1 + "px," + (Math.sin(a) * d * 1.1 + fall) + "px) scale(.5)", opacity: 0 }
+    ], { duration: rand(800, 1500), easing: "cubic-bezier(.16,1,.3,1)" }).onfinish = () => b.remove();
   }
 }
 function fireworks(x, y, rounds) {
-  const sets = [["#f2c14e", "#ffffff"], ["#e0313f", "#f2a93b"], ["#1677c2", "#4aa3df", "#ffffff"]];
-  for (let k = 0; k < rounds; k++) setTimeout(() => burst(x + rand(-60, 60), y - rand(20, 110), 22, sets[k % 3], "dot", rand(60, 95)), k * 380);
+  for (let k = 0; k < rounds; k++) setTimeout(() => burst(x + rand(-60, 60), y - rand(20, 110), randInt(16, 30), pick(FIRE_SETS), "dot", rand(55, 105)), k * rand(250, 450));
 }
 function confetti(x, y, n) {
-  const cols = ["#e0313f", "#1677c2", "#f2a93b", "#2f9e6e", "#7b5cd6", "#c23b8c"];
+  const cols = ["#e0313f", "#1677c2", "#f2a93b", "#2f9e6e", "#7b5cd6", "#c23b8c", "#aecbfa", "#fdd663", "#a8dab5"];
   for (let i = 0; i < n; i++) {
-    const b = bit(x + rand(-30, 30), y + rand(-10, 10), "", { width: rand(5, 8) + "px", height: rand(3, 6) + "px", background: cols[i % cols.length], borderRadius: "1px" });
-    const dx = rand(-160, 160), up = rand(60, 160), dn = rand(180, 360);
+    const b = bit(x + rand(-34, 34), y + rand(-10, 10), "", { width: rand(4, 9) + "px", height: rand(3, 7) + "px", background: pick(cols), borderRadius: Math.random() < .3 ? "50%" : "1px" });
+    const dx = rand(-180, 180), up = rand(40, 180), dn = rand(160, 380);
     b.animate([
       { transform: "translate(0,0) rotate(0)", opacity: 1 },
-      { transform: "translate(" + dx * .5 + "px," + -up + "px) rotate(" + rand(-360, 360) + "deg)", offset: .3, easing: "ease-in" },
+      { transform: "translate(" + dx * .5 + "px," + -up + "px) rotate(" + rand(-360, 360) + "deg)", offset: rand(.22, .38), easing: "ease-in" },
       { transform: "translate(" + dx + "px," + dn + "px) rotate(" + rand(-720, 720) + "deg)", opacity: 0 }
-    ], { duration: rand(1400, 2200) }).onfinish = () => b.remove();
+    ], { duration: rand(1300, 2600) }).onfinish = () => b.remove();
   }
 }
-function hearts(x, y, n = 7) {
+// 14 February: hearts rise slowly, swaying, in different sizes and reds
+function hearts(x, y, n = 3) {
+  const reds = ["#e0313f", "#f06292", "#ff8a80", "#c2185b", "#f6aea9"];
   for (let i = 0; i < n; i++) {
-    const b = bit(x - 8 + rand(-24, 24), y, HEART);
-    b.animate([
-      { transform: "translateY(0) scale(.5)", opacity: 0 },
-      { transform: "translateY(-30px) scale(1)", opacity: 1, offset: .25 },
-      { transform: "translate(" + rand(-30, 30) + "px,-" + rand(110, 170) + "px) scale(.8)", opacity: 0 }
-    ], { duration: rand(1400, 2000), delay: i * 90, easing: "cubic-bezier(.2,.7,.3,1)", fill: "backwards" }).onfinish = () => b.remove();
+    const s = rand(.7, 1.45);
+    const b = bit(x - 8 + rand(-26, 26), y + rand(-8, 8), HEART(pick(reds), s));
+    const rise = rand(140, 240), sway = rand(10, 26) * (Math.random() < .5 ? -1 : 1), drift = rand(-30, 30);
+    const kf = [];
+    for (let k = 0; k <= 8; k++) {
+      const t = k / 8;
+      kf.push({
+        transform: "translate(" + (drift * t + sway * Math.sin(t * Math.PI * 2.2)).toFixed(1) + "px," + (-rise * t).toFixed(1) + "px) rotate(" + (sway * .6 * Math.sin(t * Math.PI * 2.2 + .6)).toFixed(1) + "deg) scale(" + (t < .15 ? .4 + 4 * t : 1).toFixed(2) + ")",
+        opacity: t < .12 ? t / .12 : t > .7 ? (1 - t) / .3 : 1
+      });
+    }
+    b.animate(kf, { duration: rand(3400, 5200), delay: i * rand(150, 450), easing: "linear", fill: "backwards" }).onfinish = () => b.remove();
   }
 }
 function ping(r) {
-  const b = bit(r.left + 12, r.top + 10, "", { width: "34px", height: "34px", borderRadius: "50%", boxShadow: "0 0 0 2px #1677c2" });
-  b.animate([{ transform: "scale(.6)", opacity: 1 }, { transform: "scale(2.2)", opacity: 0 }], { duration: 900, easing: "cubic-bezier(.16,1,.3,1)" }).onfinish = () => b.remove();
+  const s = rand(28, 40);
+  const b = bit(r.left + 12, r.top + 10, "", { width: s + "px", height: s + "px", borderRadius: "50%", boxShadow: "0 0 0 2px #1677c2" });
+  b.animate([{ transform: "scale(.6)", opacity: 1 }, { transform: "scale(" + rand(1.8, 2.6) + ")", opacity: 0 }], { duration: rand(800, 1200), easing: "cubic-bezier(.16,1,.3,1)" }).onfinish = () => b.remove();
 }
 // 3. Booking milestones.
 function afterBooking(id, date) {
