@@ -159,7 +159,7 @@ function sheetHTML(i) {
   const dim = new Date(Y, M + 1, 0).getDate();
   const cells = Math.max(35, Math.ceil((lead + dim) / 7) * 7);
   const today = todayIso();
-  let h = '<div class="s-head"><h2 class="s-title">' + MONTHS[M] + "<b>" + Y + '</b></h2><span class="s-note">Lightship Chartering Genova<br>Holiday planner</span></div>';
+  let h = '<div class="s-head"><h2 class="s-title">' + MONTHS[M] + "<b>" + Y + '</b></h2></div>';
   h += '<div class="wd">' + DAY3.map((d, k) => '<span class="' + (k >= 5 ? "sun" : "") + '">' + d + "</span>").join("") + "</div>";
   h += '<div class="days">';
   for (let k = 0; k < cells; k++) {
