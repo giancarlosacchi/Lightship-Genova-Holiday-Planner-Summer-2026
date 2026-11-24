@@ -11,11 +11,18 @@ const DAYS   = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","S
 const DAY3   = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
 
 const HOLIDAYS = {
-  "2026-12-08": "Immacolata",
+  "2026-12-08": "Immaculate Conception",
   "2026-12-25": "Christmas",
   "2026-12-26": "St Stephen",
   "2027-01-01": "New Year",
   "2027-01-06": "Epiphany",
+};
+
+// written on the calendar by hand, in black marker
+const SCRIBBLES = {
+  "2026-12-08": "Gian's birthday",
+  "2026-12-30": "Bert's birthday",
+  "2027-01-10": "Lella's birthday",
 };
 
 const DEPARTMENTS = [
@@ -151,6 +158,7 @@ function sheetHTML(i) {
     const eggAttr = egg ? ' data-egg="' + egg + '"' : "";
     let inner = '<span class="n">' + t.getDate() + "</span>";
     if (hol && inM) inner += '<span class="hn">' + hol + "</span>";
+    if (SCRIBBLES[date] && inM) inner += '<span class="scribble" style="--tilt:' + tilt("s" + date) + 'deg">' + SCRIBBLES[date] + "</span>";
     if (inM && !isFree(date)) {
       const off = offOn(date);
       if (off.length) {
@@ -484,7 +492,7 @@ function parkingSpots() {
   document.querySelectorAll("#sheet .c").forEach(c => {
     if (c.querySelector(".chips")) return;
     const r = c.getBoundingClientRect();
-    const weight = c.querySelector(".hn") ? .3 : c.classList.contains("out") || c.classList.contains("sat") || c.classList.contains("sun") ? 3 : 1;
+    const weight = c.querySelector(".hn, .scribble") ? .3 : c.classList.contains("out") || c.classList.contains("sat") || c.classList.contains("sun") ? 3 : 1;
     out.push({ x: r.left - pad.left + r.width * .6, y: r.top - pad.top + r.height * .6, weight, date: c.dataset.date });
   });
   return out;

@@ -497,3 +497,19 @@ button.me-tag { font-family: "Patrick Hand", cursive; font-size: 19px; font-weig
   .chip, .chip.mine, .chip.clash, .chip.mine.clash { padding: 2px 0 1px; font-size: 12.5px; text-align: center; justify-content: center; border-radius: 1px; transform: rotate(calc(var(--tilt, 0deg) * .5)); }
   .chip::after { height: 3px; }
 }
+
+/* ---------- birthdays, written on the page in black marker ---------- */
+.scribble {
+  display: inline-block;
+  margin-top: 1px;
+  font-family: "Permanent Marker", "Segoe Print", cursive;
+  font-size: 16px; line-height: 1.15;
+  color: #1c1c1c;
+  letter-spacing: .01em;
+  transform: rotate(calc(var(--tilt, 0deg) * .7));
+  transform-origin: 0 50%;
+  opacity: .92;
+}
+@media (max-width: 760px) {
+  .scribble { font-size: 10.5px; line-height: 1.05; }
+}
