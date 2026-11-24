@@ -514,50 +514,27 @@ button.me-tag { font-family: "Patrick Hand", cursive; font-size: 19px; font-weig
   .scribble { font-size: 10.5px; line-height: 1.05; }
 }
 
-/* ---------- behind the page: a TV-studio night ---------- */
-body { background: #03051a; }
-.studio {
-  position: fixed; inset: 0; z-index: -1; overflow: hidden; pointer-events: none;
-  background: radial-gradient(ellipse 85% 75% at 50% 46%, #1d2c86 0%, #111a5a 32%, #080d36 60%, #03051a 100%);
-}
-.studio i { position: absolute; display: block; }
-/* the glow right behind the calendar */
-.studio .halo {
-  left: 50%; top: 46%; width: 120vmax; height: 120vmax; transform: translate(-50%, -50%);
-  background: radial-gradient(closest-side, rgba(120,150,255,.38), rgba(90,70,200,.16) 40%, transparent 70%);
-  animation: halo 9s ease-in-out infinite alternate;
-}
-/* light rays fanning out from the middle, turning very slowly */
-.studio .rays {
-  left: 50%; top: 46%; width: 220vmax; height: 220vmax; margin: -110vmax 0 0 -110vmax;
-  -webkit-mask: radial-gradient(closest-side, #000 8%, rgba(0,0,0,.55) 35%, transparent 70%);
-          mask: radial-gradient(closest-side, #000 8%, rgba(0,0,0,.55) 35%, transparent 70%);
-}
-.studio .r1 { background: repeating-conic-gradient(from 0deg, rgba(150,180,255,.13) 0deg 3.5deg, transparent 3.5deg 15deg); animation: spin 140s linear infinite; }
-.studio .r2 { background: repeating-conic-gradient(from 7deg, rgba(170,120,255,.09) 0deg 2deg, transparent 2deg 22.5deg); animation: spin 200s linear infinite reverse; }
-/* two studio spotlights sweeping from above */
-.studio .spot {
-  top: -20vh; width: 34vw; height: 140vh; transform-origin: 50% 0;
-  background: linear-gradient(180deg, rgba(190,210,255,.22), rgba(140,160,255,.06) 55%, transparent 85%);
-  clip-path: polygon(44% 0, 56% 0, 100% 100%, 0 100%);
-  filter: blur(14px); mix-blend-mode: screen;
-}
-.studio .s1 { left: 6vw;  animation: sweepL 17s ease-in-out infinite alternate; }
-.studio .s2 { right: 6vw; animation: sweepR 21s ease-in-out infinite alternate; }
-/* a polished floor catching the light at the bottom */
-.studio .floor {
-  left: -10%; right: -10%; bottom: -28vh; height: 55vh; border-radius: 50%;
-  background: radial-gradient(closest-side, rgba(110,140,255,.28), rgba(60,70,190,.1) 55%, transparent 75%);
-}
-@keyframes spin { to { transform: rotate(360deg); } }
-@keyframes halo { from { opacity: .75; } to { opacity: 1; } }
-@keyframes sweepL { from { transform: rotate(-24deg); } to { transform: rotate(14deg); } }
-@keyframes sweepR { from { transform: rotate(22deg); } to { transform: rotate(-16deg); } }
-@media (prefers-reduced-motion: reduce) { .studio i { animation: none !important; } }
+/* ---------- behind the page: a soft pastel mesh ---------- */
+/* sky blue from the left, salmon pink on the right, butter yellow at the
+   bottom, mint in the bottom-right corner, almost white in the middle */
+body { background: #f4f5f8; }
+.mesh { position: fixed; inset: 0; z-index: -1; overflow: hidden; pointer-events: none; background: #f5f6f9; }
+.mesh i { position: absolute; display: block; border-radius: 50%; filter: blur(70px); will-change: transform; }
+.mesh .b1 { left: -18vw; top: -22vh; width: 70vw; height: 75vh; background: #a9c8f5; opacity: .95; animation: d1 38s ease-in-out infinite alternate; }
+.mesh .b2 { left: -22vw; top: 30vh; width: 50vw; height: 70vh; background: #c4d9f7; opacity: .9; animation: d2 44s ease-in-out infinite alternate; }
+.mesh .b3 { right: -20vw; top: 6vh; width: 52vw; height: 85vh; background: #f2b8b0; opacity: .85; animation: d3 41s ease-in-out infinite alternate; }
+.mesh .b4 { left: 18vw; bottom: -30vh; width: 62vw; height: 65vh; background: #fbe8a8; opacity: .95; animation: d4 47s ease-in-out infinite alternate; }
+.mesh .b5 { right: -14vw; bottom: -26vh; width: 46vw; height: 60vh; background: #bfe6cb; opacity: .9; animation: d5 36s ease-in-out infinite alternate; }
+.mesh .b6 { left: 30vw; top: 18vh; width: 44vw; height: 50vh; background: #ffffff; opacity: .85; animation: d6 50s ease-in-out infinite alternate; }
+@keyframes d1 { to { transform: translate(6vw, 5vh) scale(1.08); } }
+@keyframes d2 { to { transform: translate(4vw, -6vh) scale(.95); } }
+@keyframes d3 { to { transform: translate(-6vw, 6vh) scale(1.06); } }
+@keyframes d4 { to { transform: translate(-5vw, -4vh) scale(1.1); } }
+@keyframes d5 { to { transform: translate(-4vw, -5vh) scale(.92); } }
+@keyframes d6 { to { transform: translate(5vw, 4vh) scale(1.12); } }
+@media (prefers-reduced-motion: reduce) { .mesh i { animation: none !important; } }
 
-/* the top bar now sits on a dark stage */
-.months { background: rgba(255,255,255,.9); box-shadow: 0 8px 24px -10px rgba(0,0,0,.6); }
-.sheets::after { box-shadow: 0 18px 40px -8px rgba(0,0,0,.55); }
+.months { background: rgba(255,255,255,.72); box-shadow: inset 0 0 0 1px rgba(255,255,255,.6), 0 6px 20px -10px rgba(40,60,120,.25); backdrop-filter: blur(10px); }
 
 /* ---------- birthdays: real handwriting ---------- */
 .scribble { display: inline-block; max-width: 100%; transform: rotate(var(--tilt, 0deg)) scaleX(var(--sx, 1)); font-size: 16px; word-spacing: .12em; }
@@ -582,5 +559,4 @@ body { background: #03051a; }
 @keyframes pzSteam { 0% { opacity: 0; transform: translateY(4px); } 35% { opacity: .75; } 100% { opacity: 0; transform: translateY(-14px) scaleX(1.3); } }
 
 @media (prefers-reduced-motion: reduce) {
-  .bulb, .bulb .glow, .bulb .glass { animation: none; }
 }
