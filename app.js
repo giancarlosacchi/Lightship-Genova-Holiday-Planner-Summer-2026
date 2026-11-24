@@ -731,14 +731,18 @@ function christmasTree(date) {
 function befanaShadow() {
   const host = document.createElement("div");
   host.className = "befana-shadow";
+  // she faces the way she flies (left): nose and arms toward the handle,
+  // the bristles behind her, the sack on her back, the scarf streaming back
   host.innerHTML = '<svg viewBox="0 0 120 70" aria-hidden="true"><g>' +
-    '<path d="M4 46 L84 34 L85 37 L5 49 Z"/>' +
-    '<path d="M84 31 C96 26 112 24 118 22 C113 30 108 34 116 40 C106 40 96 42 86 41 Z"/>' +
-    '<path d="M38 41 C36 30 40 20 47 16 L55 18 C58 26 58 34 56 40 Z"/>' +
-    '<circle cx="50" cy="13" r="6"/>' +
-    '<path d="M42 10 L57 2 L60 12 Z"/>' +
-    '<path d="M55 30 C64 34 70 40 72 47 L68 48 C64 42 60 38 54 36 Z"/>' +
-    '<path d="M30 34 C26 30 26 24 30 22 C34 24 34 30 33 34 Z"/></g></svg>';
+    '<path d="M4 46 L84 34 L85 37 L5 49 Z"/>' +                                              // handle, tip in front
+    '<path d="M84 31 C96 26 112 24 118 22 C113 30 108 34 116 40 C106 40 96 42 86 41 Z"/>' +     // bristles, behind
+    '<path d="M62 39 C64 28 60 19 51 15 L45 16 C41 22 40 31 42 40 Z"/>' +                      // cloak, leaning forward
+    '<circle cx="44" cy="12" r="5.5"/>' +                                                        // head
+    '<path d="M39.5 11 L33.5 14 L39.5 15 Z"/>' +                                                 // the famous nose, pointing ahead
+    '<path d="M39 9 C42 3 51 2 55 6 L65 3 L59 11 L50 10 Z"/>' +                                  // headscarf streaming back
+    '<path d="M46 24 L30 39 L33 42 L49 29 Z"/>' +                                                // arm holding the handle
+    '<path d="M45 40 C43 47 39 51 34 53 L35 56 C42 54 47 49 49 41 Z"/>' +                        // legs, dangling forward
+    '<path d="M60 33 C57 25 61 19 68 20 C73 24 72 33 65 37 Z"/></g></svg>';                     // sack of sweets on her back
   $(".sheets").appendChild(host);
   return () => {
     host.classList.add("out");
